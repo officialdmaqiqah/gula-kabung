@@ -23,10 +23,10 @@ export default function AdminPurchases() {
     produkId: '',
     namaProduk: '',
     jumlahBeli: 1,
-    jumlahDiterima: 1,
+    jumlahDiterima: 0,
     hargaBeliTotal: 0,
     rekeningId: '',
-    statusPenerimaan: 'Selesai',
+    statusPenerimaan: 'Pending',
     catatan: ''
   });
 
@@ -109,10 +109,10 @@ export default function AdminPurchases() {
         produkId: '', 
         namaProduk: '',
         jumlahBeli: 1, 
-        jumlahDiterima: 1,
+        jumlahDiterima: 0,
         hargaBeliTotal: 0,
         rekeningId: accounts.length > 0 ? accounts[0].id : '',
-        statusPenerimaan: 'Selesai',
+        statusPenerimaan: 'Pending',
         catatan: ''
       });
     }
