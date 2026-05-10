@@ -28,8 +28,7 @@ export const AuthProvider = ({ children }) => {
   }, [location.pathname, navigate]);
 
   const login = (username, password) => {
-    // Statik username & password untuk MVP
-    if (username === 'admin' && password === 'admin123') {
+    if (username === 'gulakabung' && password === 'kabung2024') {
       localStorage.setItem('kabungmart_admin_auth', 'true');
       setIsAuthenticated(true);
       navigate('/admin/dashboard');

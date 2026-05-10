@@ -84,10 +84,6 @@ export default function AdminLogin() {
             Login
           </button>
         </form>
-        
-        <div className="mt-6 text-center text-xs text-brown-400">
-          Untuk MVP: admin / admin123
-        </div>
       </div>
     </div>
   );
