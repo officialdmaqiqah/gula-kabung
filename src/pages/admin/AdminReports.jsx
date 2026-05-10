@@ -1,17 +1,41 @@
-import React, { useState, useMemo } from 'react';
-import { useLocalStorage } from '../../hooks/useLocalStorage';
+import React, { useState, useEffect, useMemo } from 'react';
+import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
-import { FileText, Calendar, Download } from 'lucide-react';
+import { FileText, Calendar, Download, Loader2 } from 'lucide-react';
 
 export default function AdminReports() {
-  const [sales] = useLocalStorage('kabungmart_sales', []);
-  const [expenses] = useLocalStorage('kabungmart_expenses', []);
-  const [purchases] = useLocalStorage('kabungmart_purchases', []);
-  const [incomes] = useLocalStorage('kabungmart_incomes', []);
+  const [sales, setSales] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+  const [incomes, setIncomes] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   const [filterPeriod, setFilterPeriod] = useState('Bulan ini');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true);
+      const { data: salesData } = await supabase.from('kabung_sales').select('*');
+      const { data: purchasesData } = await supabase.from('kabung_purchases').select('*');
+      const { data: expensesData } = await supabase.from('kabung_expenses').select('*');
+      const { data: incomesData } = await supabase.from('kabung_incomes').select('*');
+
+      setSales(salesData || []);
+      setPurchases(purchasesData || []);
+      setExpenses(expensesData || []);
+      setIncomes(incomesData || []);
+    } catch (error) {
+      console.error('Error fetching data for reports:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const { filteredSales, filteredExpenses, filteredPurchases, filteredIncomes } = useMemo(() => {
     const today = new Date();
@@ -30,7 +54,7 @@ export default function AdminReports() {
 
     return {
       filteredSales: sales.filter(s => {
-        if (s.statusPembayaran !== 'Sudah bayar') return false;
+        if (s.status_pembayaran !== 'Sudah bayar') return false;
         
         if (filterPeriod === 'Hari ini') return s.tanggal === todayStr;
         if (filterPeriod === 'Minggu ini') return s.tanggal >= startOfWeekStr && s.tanggal <= todayStr;
@@ -71,12 +95,12 @@ export default function AdminReports() {
   }, [sales, expenses, purchases, incomes, filterPeriod, customStartDate, customEndDate]);
 
   const { totalPemasukan, totalPengeluaran, labaBersih, txCount, expenseCount } = useMemo(() => {
-    const totalPemasukanSales = filteredSales.reduce((sum, s) => sum + s.totalPenjualan, 0);
-    const totalPemasukanManual = filteredIncomes.reduce((sum, i) => sum + i.jumlah, 0);
+    const totalPemasukanSales = filteredSales.reduce((sum, s) => sum + Number(s.total_penjualan), 0);
+    const totalPemasukanManual = filteredIncomes.reduce((sum, i) => sum + Number(i.jumlah), 0);
     const totalPemasukan = totalPemasukanSales + totalPemasukanManual;
 
-    const totalPengeluaranExp = filteredExpenses.reduce((sum, e) => sum + e.jumlah, 0);
-    const totalPengeluaranPur = filteredPurchases.reduce((sum, p) => sum + p.hargaBeliTotal, 0);
+    const totalPengeluaranExp = filteredExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
+    const totalPengeluaranPur = filteredPurchases.reduce((sum, p) => sum + Number(p.harga_beli_total), 0);
     const totalPengeluaran = totalPengeluaranExp + totalPengeluaranPur;
 
     return {
@@ -86,7 +110,7 @@ export default function AdminReports() {
       txCount: filteredSales.length,
       expenseCount: filteredExpenses.length + filteredPurchases.length
     };
-  }, [filteredSales, filteredExpenses, filteredPurchases]);
+  }, [filteredSales, filteredExpenses, filteredPurchases, filteredIncomes]);
 
   return (
     <div>
@@ -115,7 +139,12 @@ export default function AdminReports() {
         </div>
       </div>
 
-      {filteredSales.length === 0 && filteredExpenses.length === 0 && filteredPurchases.length === 0 ? (
+      {loading ? (
+        <div className="bg-white p-12 rounded-3xl border border-brand-brown/10 text-center shadow-sm">
+          <Loader2 className="w-16 h-16 text-brand-gold animate-spin mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-brand-brown mb-2">Memuat Laporan...</h3>
+        </div>
+      ) : filteredSales.length === 0 && filteredExpenses.length === 0 && filteredPurchases.length === 0 ? (
         <div className="bg-white p-12 rounded-3xl border border-brand-brown/10 text-center shadow-sm">
           <FileText className="w-16 h-16 text-brand-brown/20 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-brand-brown mb-2">Belum Ada Data</h3>
