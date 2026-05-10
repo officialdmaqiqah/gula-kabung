@@ -7,6 +7,7 @@ import { useCart } from '../context/CartContext';
 export default function CatalogPage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { addToCart } = useCart();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Semua');
@@ -20,13 +21,20 @@ export default function CatalogPage() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      setError(null);
+      const { data, fetchError } = await supabase
         .from('kabung_products')
         .select('*')
         .eq('status_aktif', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
+
+      if (!data) {
+        console.warn('No data returned from Supabase');
+        setProducts([]);
+        return;
+      }
 
       const mappedData = data.map(p => ({
         id: p.id,
@@ -42,8 +50,9 @@ export default function CatalogPage() {
       }));
 
       setProducts(mappedData);
-    } catch (error) {
-      console.error('Error fetching catalog:', error.message);
+    } catch (err) {
+      console.error('Supabase Fetch Error:', err);
+      setError(err.message || 'Gagal terhubung ke database.');
     } finally {
       setLoading(false);
     }
@@ -111,6 +120,15 @@ export default function CatalogPage() {
           <div className="flex flex-col items-center justify-center py-32 animate-fade-in">
             <Loader2 className="w-16 h-16 text-brand-gold animate-spin mb-6" />
             <p className="text-sm font-black uppercase tracking-[0.3em] text-brand-brown/40">Menyiapkan Koleksi...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-20 bg-rose-50 rounded-[4rem] border border-rose-100 shadow-sm animate-fade-in">
+            <div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <XCircle className="w-10 h-10 text-rose-500" />
+            </div>
+            <h3 className="text-2xl font-heading font-black text-rose-900 mb-2 tracking-tight">Koneksi Database Gagal</h3>
+            <p className="text-rose-700/60 mb-8 max-w-sm mx-auto font-medium">{error}</p>
+            <button onClick={() => fetchProducts()} className="bg-rose-500 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all">Coba Lagi</button>
           </div>
         ) : filteredProducts.length > 0 ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
