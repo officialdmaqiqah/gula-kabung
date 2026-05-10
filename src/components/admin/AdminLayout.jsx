@@ -81,8 +81,6 @@ export default function AdminLayout() {
           );
         })}
       </nav>
-
-      </nav>
     </div>
   );
 

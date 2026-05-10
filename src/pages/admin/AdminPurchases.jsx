@@ -25,7 +25,7 @@ export default function AdminPurchases() {
     jumlahBeli: 1,
     jumlahDiterima: 0,
     hargaBeliTotal: 0,
-    rekeningId: '',
+    rekeningId: accounts?.length > 0 ? accounts[0].id : '',
     statusPenerimaan: 'Pending',
     buktiPembayaran: '',
     catatan: ''
@@ -92,7 +92,7 @@ export default function AdminPurchases() {
   };
 
   const handleProductSelect = (e) => {
-    const selectedProd = products.find(p => p.id.toString() === e.target.value);
+    const selectedProd = (products || []).find(p => p.id?.toString() === e.target.value);
     setFormData({
       ...formData,
       produkId: e.target.value,
@@ -105,14 +105,14 @@ export default function AdminPurchases() {
       setEditingId(purchase.id);
       setFormData({
         tanggal: purchase.tanggal,
-        supplierId: purchase.supplier_id,
-        namaPetani: purchase.nama_petani,
-        produkId: purchase.produk_id,
-        namaProduk: purchase.nama_produk,
-        jumlahBeli: purchase.jumlah_beli,
+        supplierId: purchase.supplier_id || '',
+        namaPetani: purchase.nama_petani || '',
+        produkId: purchase.produk_id || '',
+        namaProduk: purchase.nama_produk || '',
+        jumlahBeli: purchase.jumlah_beli || 1,
         jumlahDiterima: purchase.jumlah_diterima || 0,
-        hargaBeliTotal: purchase.harga_beli_total,
-        rekeningId: purchase.rekening_id,
+        hargaBeliTotal: purchase.harga_beli_total || 0,
+        rekeningId: purchase.rekening_id || (accounts?.length > 0 ? accounts[0].id : ''),
         statusPenerimaan: purchase.status_penerimaan || 'Pending',
         buktiPembayaran: purchase.bukti_pembayaran || '',
         catatan: purchase.catatan || ''
@@ -128,7 +128,7 @@ export default function AdminPurchases() {
         jumlahBeli: 1, 
         jumlahDiterima: 0,
         hargaBeliTotal: 0,
-        rekeningId: accounts.length > 0 ? accounts[0].id : '',
+        rekeningId: accounts?.length > 0 ? accounts[0].id : '',
         statusPenerimaan: 'Pending',
         buktiPembayaran: '',
         catatan: ''
