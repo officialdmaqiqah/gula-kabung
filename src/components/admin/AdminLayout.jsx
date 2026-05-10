@@ -82,16 +82,7 @@ export default function AdminLayout() {
         })}
       </nav>
 
-      {/* Sidebar Footer */}
-      <div className="p-6 border-t border-white/5">
-        <Link 
-          to="/"
-          className="flex items-center gap-4 px-8 py-4 text-white/40 hover:bg-white/5 hover:text-white rounded-2xl transition-all text-[10px] font-black uppercase tracking-[0.2em]"
-        >
-          <Home className="w-4 h-4" />
-          <span>Ke Toko</span>
-        </Link>
-      </div>
+      </nav>
     </div>
   );
 
