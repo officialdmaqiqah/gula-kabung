@@ -67,7 +67,7 @@ export default function LandingPage() {
           {/* TEXT CONTENT */}
           <div className="w-full lg:w-3/5 flex flex-col justify-center text-center lg:text-left z-10">
             <div className="inline-flex items-center gap-2 py-2 px-5 rounded-full bg-brand-brown/5 border border-brand-brown/10 text-brand-brown text-[10px] font-black tracking-[0.3em] uppercase mb-10 self-center lg:self-start animate-fade-in">
-              <Star className="w-3 h-3 text-brand-gold fill-brand-gold" /> Terpercaya Sejak 1985
+              <Star className="w-3 h-3 text-brand-gold fill-brand-gold" /> Terpercaya Puluhan Tahun
             </div>
             
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-heading font-black text-brand-brown mb-8 leading-[1] tracking-tight animate-slide-up">
