@@ -1,24 +1,61 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, Leaf, ChevronRight, Award, Zap, Star } from 'lucide-react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { ArrowRight, ShieldCheck, Leaf, ChevronRight, Award, Zap, Star, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { formatRupiah } from '../utils/format';
 
 export default function LandingPage() {
-  const [adminProducts] = useLocalStorage('kabungmart_products', []);
-  const [siteSettings] = useLocalStorage('kabungmart_settings', { heroImage: '', whatsapp: '6281234567890' });
+  const [products, setProducts] = useState([]);
+  const [siteSettings, setSiteSettings] = useState({ hero_image: '', whatsapp: '6281234567890' });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLandingData();
+  }, []);
+
+  const fetchLandingData = async () => {
+    try {
+      setLoading(true);
+      const { data: productsData } = await supabase
+        .from('kabung_products')
+        .select('*')
+        .eq('status_aktif', true)
+        .order('created_at', { ascending: false });
+      
+      const { data: settingsData } = await supabase
+        .from('kabung_settings')
+        .select('*')
+        .eq('id', 'main')
+        .single();
+
+      if (productsData) setProducts(productsData);
+      if (settingsData) setSiteSettings(settingsData);
+    } catch (error) {
+      console.error('Error fetching landing data:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const SELLER_NUMBER = siteSettings.whatsapp || '6281234567890';
   const chatUrl = `https://wa.me/${SELLER_NUMBER}?text=${encodeURIComponent('Halo, saya ingin bertanya tentang Gula Kabung Belitung.')}`;
 
-  const displayProducts = adminProducts.filter(p => p.statusAktif).map(p => ({
+  const featuredProducts = products.slice(0, 3).map(p => ({
     id: p.id,
-    name: p.namaProduk,
-    price: formatRupiah(p.hargaJual),
+    name: p.nama_produk,
+    price: formatRupiah(p.harga_jual),
     label: p.stok <= 0 ? 'Habis' : (p.stok <= 5 ? 'Stok Menipis' : ''),
-    image: p.imageUrl
+    image: p.image_url
   }));
 
-  const featuredProducts = displayProducts.slice(0, 3);
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-brand-cream flex flex-col items-center justify-center">
+        <Loader2 className="w-16 h-16 text-brand-gold animate-spin mb-6" />
+        <p className="text-sm font-black uppercase tracking-[0.3em] text-brand-brown/40">Menyambut Anda...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-brand-cream font-sans overflow-x-hidden">
@@ -62,7 +99,7 @@ export default function LandingPage() {
           <div className="w-full lg:w-2/5 relative flex justify-center lg:justify-end animate-fade-in animation-delay-600">
             <div className="relative w-full max-w-[450px] aspect-[4/5] rounded-[3rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(88,55,43,0.3)] border-[12px] border-white group">
               <img 
-                src={siteSettings.heroImage || "https://images.unsplash.com/photo-1596450514735-30089f28941f?auto=format&fit=crop&q=80&w=1000"} 
+                src={siteSettings.hero_image || "https://images.unsplash.com/photo-1596450514735-30089f28941f?auto=format&fit=crop&q=80&w=1000"} 
                 alt="Gula Kabung Belitung" 
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
               />
