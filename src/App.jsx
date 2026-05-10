@@ -19,6 +19,7 @@ import AdminSales from './pages/admin/AdminSales';
 import AdminFinances from './pages/admin/AdminFinances';
 import AdminReports from './pages/admin/AdminReports';
 import AdminSettings from './pages/admin/AdminSettings';
+import AdminReceiving from './pages/admin/AdminReceiving';
 
 function App() {
   const location = useLocation();
@@ -76,6 +77,7 @@ function App() {
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="products" element={<AdminProducts />} />
               <Route path="purchases" element={<AdminPurchases />} />
+              <Route path="receiving" element={<AdminReceiving />} />
               <Route path="sales" element={<AdminSales />} />
               <Route path="finances" element={<AdminFinances />} />
               <Route path="reports" element={<AdminReports />} />

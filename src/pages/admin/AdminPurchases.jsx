@@ -142,33 +142,13 @@ export default function AdminPurchases() {
       };
 
       if (editingId) {
-        const oldPurchase = purchases.find(p => p.id === editingId);
         const { error } = await supabase.from('kabung_purchases').update(payload).eq('id', editingId);
         if (error) throw error;
-
-        // Update Stock (Based on RECEIVED quantity)
-        const diff = Number(payload.jumlah_diterima) - (oldPurchase ? (oldPurchase.jumlah_diterima || oldPurchase.jumlah_beli) : 0);
-        if (diff !== 0) {
-          const product = products.find(p => p.id.toString() === formData.produkId);
-          if (product) {
-            await supabase.from('kabung_products').update({ 
-              stok: product.stok + diff 
-            }).eq('id', formData.produkId);
-          }
-        }
-        toast.success('Data pembelian diperbarui!');
+        toast.success('Data pesanan diperbarui!');
       } else {
         const { error } = await supabase.from('kabung_purchases').insert([payload]);
         if (error) throw error;
-
-        // Add Stock (Only Received)
-        const product = products.find(p => p.id.toString() === formData.produkId);
-        if (product) {
-          await supabase.from('kabung_products').update({ 
-            stok: product.stok + Number(payload.jumlah_diterima) 
-          }).eq('id', formData.produkId);
-        }
-        toast.success('Pembelian berhasil dicatat. Stok bertambah sesuai jumlah diterima.');
+        toast.success('Pesanan berhasil dicatat sebagai Pre-Order.');
       }
 
       await fetchInitialData();
@@ -181,26 +161,14 @@ export default function AdminPurchases() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Yakin ingin menghapus pembelian ini? Stok produk akan dikurangi sesuai jumlah yang sudah diterima.')) {
+    if (window.confirm('Yakin ingin menghapus data pesanan ini?')) {
       try {
         setLoading(true);
-        const purchaseToDelete = purchases.find(p => p.id === id);
-        
-        if (purchaseToDelete) {
-          const product = products.find(p => p.id.toString() === purchaseToDelete.produk_id);
-          if (product) {
-            const received = purchaseToDelete.jumlah_diterima || purchaseToDelete.jumlah_beli;
-            await supabase.from('kabung_products').update({ 
-              stok: Math.max(0, product.stok - received) 
-            }).eq('id', purchaseToDelete.produk_id);
-          }
-        }
-
         const { error } = await supabase.from('kabung_purchases').delete().eq('id', id);
         if (error) throw error;
         
         await fetchInitialData();
-        toast.success('Data berhasil dihapus.');
+        toast.success('Data pesanan berhasil dihapus.');
       } catch (error) {
         toast.error('Gagal menghapus: ' + error.message);
       } finally {
