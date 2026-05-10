@@ -6,14 +6,13 @@ import {
   ShoppingCart, 
   Receipt, 
   BarChart3, 
-  LogOut, 
+  Power, 
   Menu, 
   X,
   Store,
   Wallet,
   Settings,
   User,
-  Home,
   Truck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -133,7 +132,7 @@ export default function AdminLayout() {
               title="Log Out"
               className="p-3 bg-rose-500/10 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-lg shadow-rose-500/10"
             >
-              <LogOut className="w-5 h-5" />
+              <Power className="w-5 h-5" />
             </button>
           </div>
         </header>
