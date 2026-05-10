@@ -35,8 +35,6 @@ export default function AdminLayout() {
   const navItems = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Produk & Stok', path: '/admin/products', icon: Package },
-    { name: 'Pembelian Stok', path: '/admin/purchases', icon: Receipt },
-    { name: 'Penerimaan Barang', path: '/admin/receiving', icon: Truck },
     { name: 'Penjualan', path: '/admin/sales', icon: ShoppingCart },
     { name: 'Pencatatan Keuangan', path: '/admin/finances', icon: Wallet },
     { name: 'Laporan Laba Rugi', path: '/admin/reports', icon: BarChart3 },
@@ -139,9 +137,30 @@ export default function AdminLayout() {
               {navItems.find(l => location.pathname.startsWith(l.path))?.name || 'Dashboard'}
             </h2>
           </div>
-          <div className="flex items-center gap-3 px-4 py-2 bg-brand-brown text-white rounded-xl shadow-lg">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Active</span>
+          
+          <div className="flex items-center gap-3">
+            {/* Logistic Quick Access Icons */}
+            <div className="flex items-center gap-2 bg-brand-brown/5 p-1.5 rounded-2xl">
+              <Link 
+                to="/admin/purchases" 
+                title="Pembelian Stok"
+                className={`p-2.5 rounded-xl transition-all ${location.pathname === '/admin/purchases' ? 'bg-brand-brown text-white shadow-lg' : 'text-brand-brown hover:bg-brand-brown/10'}`}
+              >
+                <Receipt className="w-5 h-5" />
+              </Link>
+              <Link 
+                to="/admin/receiving" 
+                title="Penerimaan Barang"
+                className={`p-2.5 rounded-xl transition-all ${location.pathname === '/admin/receiving' ? 'bg-brand-brown text-white shadow-lg' : 'text-brand-brown hover:bg-brand-brown/10'}`}
+              >
+                <Truck className="w-5 h-5" />
+              </Link>
+            </div>
+
+            <div className="flex items-center gap-3 px-4 py-2 bg-emerald-500/10 text-emerald-600 rounded-2xl border border-emerald-500/20">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Active</span>
+            </div>
           </div>
         </header>
 
