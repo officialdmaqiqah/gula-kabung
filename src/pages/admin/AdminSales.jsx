@@ -1,12 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Edit, Trash2, Search, Filter } from 'lucide-react';
-import { useLocalStorage } from '../../hooks/useLocalStorage';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Edit, Trash2, Search, Filter, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
 
 export default function AdminSales() {
-  const [sales, setSales] = useLocalStorage('kabungmart_sales', []);
-  const [products, setProducts] = useLocalStorage('kabungmart_products', []);
-  const [accounts] = useLocalStorage('kabungmart_accounts', [{ id: 'kas-tunai', namaRekening: 'Kas Tunai', saldoAwal: 0 }]);
+  const [sales, setSales] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -18,102 +20,184 @@ export default function AdminSales() {
     produkId: '',
     jumlah: 1,
     hargaSatuan: 0,
-    hargaSatuan: 0,
     metodePembayaran: 'Transfer bank',
-    rekeningId: 'kas-tunai',
+    rekeningId: '',
     statusPembayaran: 'Sudah bayar',
     channelPenjualan: 'WhatsApp',
     catatan: ''
   });
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch Sales
+      const { data: salesData, error: salesError } = await supabase
+        .from('kabung_sales')
+        .select('*')
+        .order('tanggal', { ascending: false });
+      if (salesError) throw salesError;
+
+      // Fetch Products
+      const { data: productsData, error: productsError } = await supabase
+        .from('kabung_products')
+        .select('id, nama_produk, harga_jual, stok');
+      if (productsError) throw productsError;
+
+      // Fetch Accounts
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('kabung_accounts')
+        .select('*');
+      if (accountsError) throw accountsError;
+
+      setSales(salesData || []);
+      setProducts(productsData || []);
+      setAccounts(accountsData || []);
+      
+      if (accountsData && accountsData.length > 0) {
+        setFormData(prev => ({ ...prev, rekeningId: accountsData[0].id }));
+      }
+    } catch (error) {
+      console.error('Error fetching sales data:', error.message);
+      alert('Gagal mengambil data: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleProductSelect = (e) => {
     const selectedProd = products.find(p => p.id.toString() === e.target.value);
     setFormData({
       ...formData,
       produkId: e.target.value,
-      hargaSatuan: selectedProd ? selectedProd.hargaJual : 0,
-      namaProduk: selectedProd ? selectedProd.namaProduk : ''
+      hargaSatuan: selectedProd ? selectedProd.harga_jual : 0,
+      namaProduk: selectedProd ? selectedProd.nama_produk : ''
     });
   };
 
   const handleOpenModal = (sale = null) => {
     if (sale) {
       setEditingId(sale.id);
-      setFormData(sale);
+      setFormData({
+        tanggal: sale.tanggal,
+        namaPembeli: sale.nama_pembeli,
+        produkId: sale.produk_id,
+        jumlah: sale.jumlah,
+        hargaSatuan: sale.harga_satuan,
+        metodePembayaran: sale.metode_pembayaran,
+        rekeningId: sale.rekening_id,
+        statusPembayaran: sale.status_pembayaran,
+        channelPenjualan: sale.channel_penjualan,
+        catatan: sale.catatan || '',
+        namaProduk: sale.nama_produk
+      });
     } else {
       setEditingId(null);
       setFormData({
         tanggal: new Date().toISOString().split('T')[0],
-        namaPembeli: '', produkId: '', jumlah: 1, hargaSatuan: 0,
-        metodePembayaran: 'Transfer bank', rekeningId: accounts.length > 0 ? accounts[0].id : 'kas-tunai',
+        namaPembeli: '', 
+        produkId: '', 
+        jumlah: 1, 
+        hargaSatuan: 0,
+        metodePembayaran: 'Transfer bank', 
+        rekeningId: accounts.length > 0 ? accounts[0].id : '',
         statusPembayaran: 'Sudah bayar',
-        channelPenjualan: 'WhatsApp', catatan: '', namaProduk: ''
+        channelPenjualan: 'WhatsApp', 
+        catatan: '', 
+        namaProduk: ''
       });
     }
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.produkId) return alert('Pilih produk!');
     
-    const newSale = {
-      ...formData,
-      jumlah: Number(formData.jumlah),
-      hargaSatuan: Number(formData.hargaSatuan),
-      totalPenjualan: Number(formData.jumlah) * Number(formData.hargaSatuan),
-    };
+    try {
+      setSubmitting(true);
+      
+      const payload = {
+        tanggal: formData.tanggal,
+        nama_pembeli: formData.namaPembeli,
+        produk_id: formData.produkId,
+        nama_produk: formData.namaProduk,
+        jumlah: Number(formData.jumlah),
+        harga_satuan: Number(formData.hargaSatuan),
+        total_penjualan: Number(formData.jumlah) * Number(formData.hargaSatuan),
+        metode_pembayaran: formData.metodePembayaran,
+        rekening_id: formData.rekeningId,
+        status_pembayaran: formData.statusPembayaran,
+        channel_penjualan: formData.channelPenjualan,
+        catatan: formData.catatan
+      };
 
-    let updatedProducts = [...products];
-    const productIndex = updatedProducts.findIndex(p => p.id.toString() === formData.produkId);
+      if (editingId) {
+        const oldSale = sales.find(s => s.id === editingId);
+        const { error } = await supabase.from('kabung_sales').update(payload).eq('id', editingId);
+        if (error) throw error;
 
-    if (productIndex === -1) return alert('Produk tidak ditemukan!');
-
-    if (editingId) {
-      const oldSale = sales.find(s => s.id === editingId);
-      setProducts(prevProducts => {
-        const updated = [...prevProducts];
-        const idx = updated.findIndex(p => p.id.toString() === formData.produkId);
-        if (idx !== -1) {
-          if (oldSale && oldSale.produkId === formData.produkId) {
-            const diff = newSale.jumlah - oldSale.jumlah;
-            updated[idx] = { ...updated[idx], stok: updated[idx].stok - diff };
-          } else if (oldSale) {
-            const oldIdx = updated.findIndex(p => p.id.toString() === oldSale.produkId);
-            if (oldIdx !== -1) updated[oldIdx] = { ...updated[oldIdx], stok: updated[oldIdx].stok + oldSale.jumlah };
-            updated[idx] = { ...updated[idx], stok: updated[idx].stok - newSale.jumlah };
+        // Update Stock in DB
+        const diff = Number(formData.jumlah) - (oldSale ? oldSale.jumlah : 0);
+        if (diff !== 0) {
+          const product = products.find(p => p.id.toString() === formData.produkId);
+          if (product) {
+            await supabase.from('kabung_products').update({ 
+              stok: product.stok - diff 
+            }).eq('id', formData.produkId);
           }
         }
-        return updated;
-      });
-      setSales(sales.map(s => s.id === editingId ? { ...newSale, id: editingId } : s));
-    } else {
-      setProducts(prevProducts => {
-        const updated = [...prevProducts];
-        const idx = updated.findIndex(p => p.id.toString() === formData.produkId);
-        if (idx !== -1) updated[idx] = { ...updated[idx], stok: updated[idx].stok - newSale.jumlah };
-        return updated;
-      });
-      setSales([{ ...newSale, id: Date.now() }, ...sales]);
-    }
+      } else {
+        const { error } = await supabase.from('kabung_sales').insert([payload]);
+        if (error) throw error;
 
-    setIsModalOpen(false);
+        // Decrease Stock in DB
+        const product = products.find(p => p.id.toString() === formData.produkId);
+        if (product) {
+          await supabase.from('kabung_products').update({ 
+            stok: product.stok - Number(formData.jumlah) 
+          }).eq('id', formData.produkId);
+        }
+      }
+
+      await fetchInitialData();
+      setIsModalOpen(false);
+    } catch (error) {
+      alert('Gagal menyimpan: ' + error.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Yakin ingin menghapus transaksi ini? Stok produk akan dikembalikan.')) {
-      const saleToDelete = sales.find(s => s.id === id);
-      if (saleToDelete) {
-        setProducts(prevProducts => {
-          const updated = [...prevProducts];
-          const idx = updated.findIndex(p => p.id.toString() === saleToDelete.produkId);
-          if (idx !== -1) {
-            updated[idx] = { ...updated[idx], stok: updated[idx].stok + saleToDelete.jumlah };
+      try {
+        setLoading(true);
+        const saleToDelete = sales.find(s => s.id === id);
+        
+        if (saleToDelete) {
+          // Return stock
+          const product = products.find(p => p.id.toString() === saleToDelete.produk_id);
+          if (product) {
+            await supabase.from('kabung_products').update({ 
+              stok: product.stok + saleToDelete.jumlah 
+            }).eq('id', saleToDelete.produk_id);
           }
-          return updated;
-        });
+        }
+
+        const { error } = await supabase.from('kabung_sales').delete().eq('id', id);
+        if (error) throw error;
+        
+        await fetchInitialData();
+      } catch (error) {
+        alert('Gagal menghapus: ' + error.message);
+      } finally {
+        setLoading(false);
       }
-      setSales(sales.filter(s => s.id !== id));
     }
   };
 
@@ -155,23 +239,30 @@ export default function AdminSales() {
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-brown/10">
-              {filteredSales.map((sale) => (
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-12 text-center">
+                    <Loader2 className="w-8 h-8 text-brand-gold animate-spin mx-auto mb-2" />
+                    <span className="text-sm text-brand-brown/40">Memuat data...</span>
+                  </td>
+                </tr>
+              ) : filteredSales.map((sale) => (
                 <tr key={sale.id} className="hover:bg-brand-brown/[0.02]">
                   <td className="px-6 py-4 text-sm text-brand-brown">{sale.tanggal}</td>
                   <td className="px-6 py-4">
-                    <div className="font-medium text-brand-brown">{sale.namaPembeli}</div>
-                    <div className="text-sm text-brand-brown/50">{sale.jumlah}x {sale.namaProduk}</div>
+                    <div className="font-medium text-brand-brown">{sale.nama_pembeli}</div>
+                    <div className="text-sm text-brand-brown/50">{sale.jumlah}x {sale.nama_produk}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="font-bold text-brand-brown">{formatRupiah(sale.totalPenjualan)}</div>
-                    <div className="text-xs text-brand-brown/40">{sale.metodePembayaran}</div>
+                    <div className="font-bold text-brand-brown">{formatRupiah(sale.total_penjualan)}</div>
+                    <div className="text-xs text-brand-brown/40">{sale.metode_pembayaran}</div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-md text-xs font-semibold ${
-                      sale.statusPembayaran === 'Sudah bayar' ? 'bg-green-100 text-green-700' :
-                      sale.statusPembayaran === 'Batal' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                      sale.status_pembayaran === 'Sudah bayar' ? 'bg-green-100 text-green-700' :
+                      sale.status_pembayaran === 'Batal' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
                     }`}>
-                      {sale.statusPembayaran}
+                      {sale.status_pembayaran}
                     </span>
                   </td>
                   <td className="px-6 py-4 flex justify-end gap-2">
@@ -184,7 +275,7 @@ export default function AdminSales() {
                   </td>
                 </tr>
               ))}
-              {filteredSales.length === 0 && (
+              {!loading && filteredSales.length === 0 && (
                 <tr>
                   <td colSpan="5" className="px-6 py-8 text-center text-brand-brown/40">Belum ada data transaksi.</td>
                 </tr>
@@ -214,7 +305,7 @@ export default function AdminSales() {
                   <label className="block text-sm font-medium mb-1">Produk *</label>
                   <select required value={formData.produkId} onChange={handleProductSelect} className="w-full px-3 py-2 border rounded-xl">
                     <option value="">-- Pilih Produk --</option>
-                    {products.map(p => <option key={p.id} value={p.id}>{p.namaProduk}</option>)}
+                    {products.map(p => <option key={p.id} value={p.id}>{p.nama_produk} (Stok: {p.stok})</option>)}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -242,7 +333,8 @@ export default function AdminSales() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Uang Masuk ke Rekening *</label>
                   <select required value={formData.rekeningId} onChange={e => setFormData({...formData, rekeningId: e.target.value})} className="w-full px-3 py-2 border rounded-xl">
-                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.namaRekening}</option>)}
+                    <option value="">-- Pilih Rekening --</option>
+                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.nama_rekening}</option>)}
                   </select>
                 </div>
                 <div>
@@ -255,10 +347,17 @@ export default function AdminSales() {
                   <label className="block text-sm font-medium mb-1">Total (Otomatis)</label>
                   <div className="w-full px-3 py-2 bg-gray-50 border rounded-xl font-bold">{formatRupiah(formData.jumlah * formData.hargaSatuan)}</div>
                 </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Catatan</label>
+                  <textarea rows="2" value={formData.catatan} onChange={e => setFormData({...formData, catatan: e.target.value})} className="w-full px-3 py-2 border rounded-xl"></textarea>
+                </div>
               </div>
               <div className="pt-4 border-t border-brand-brown/10 mt-6 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 hover:bg-brand-brown/5 rounded-xl text-brand-brown">Batal</button>
-                <button type="submit" className="px-4 py-2 bg-brand-gold text-white rounded-xl font-medium">Simpan</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 hover:bg-brand-brown/5 rounded-xl text-brand-brown" disabled={submitting}>Batal</button>
+                <button type="submit" className="px-4 py-2 bg-brand-gold text-white rounded-xl font-medium flex items-center gap-2" disabled={submitting}>
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {submitting ? 'Menyimpan...' : 'Simpan Transaksi'}
+                </button>
               </div>
             </form>
           </div>
