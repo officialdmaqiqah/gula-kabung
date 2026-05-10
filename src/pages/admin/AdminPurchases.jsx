@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Edit, Trash2, Search, Filter, Truck, Loader2, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Filter, Truck, Loader2, CheckCircle2, Clock, AlertCircle, Receipt } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
 import { toast } from 'react-hot-toast';
