@@ -1,14 +1,16 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Edit, Trash2, Download, ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react';
-import { useLocalStorage } from '../../hooks/useLocalStorage';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Edit, Trash2, Download, ArrowUpRight, ArrowDownRight, Wallet, Loader2, XCircle } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
 
 export default function AdminFinances() {
-  const [sales] = useLocalStorage('kabungmart_sales', []);
-  const [purchases] = useLocalStorage('kabungmart_purchases', []);
-  const [expenses, setExpenses] = useLocalStorage('kabungmart_expenses', []);
-  const [incomes, setIncomes] = useLocalStorage('kabungmart_incomes', []);
-  const [accounts] = useLocalStorage('kabungmart_accounts', [{ id: 'kas-tunai', namaRekening: 'Kas Tunai', saldoAwal: 0 }]);
+  const [sales, setSales] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [incomes, setIncomes] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
@@ -18,57 +20,183 @@ export default function AdminFinances() {
 
   // --- FORM DATA ---
   const expenseCategories = ['Bahan baku', 'Kemasan', 'Transportasi', 'Gaji/upah', 'Listrik/operasional', 'Marketing', 'Lain-lain'];
-  const [expenseForm, setExpenseForm] = useState({ tanggal: '', kategori: expenseCategories[0], namaPengeluaran: '', jumlah: 0, rekeningId: 'kas-tunai', catatan: '' });
+  const [expenseForm, setExpenseForm] = useState({ tanggal: '', kategori: expenseCategories[0], namaPengeluaran: '', jumlah: 0, rekeningId: '', catatan: '' });
 
   const incomeCategories = ['Modal Awal', 'Pendanaan', 'Lain-lain'];
-  const [incomeForm, setIncomeForm] = useState({ tanggal: '', kategori: incomeCategories[0], namaPemasukan: '', jumlah: 0, rekeningId: 'kas-tunai', catatan: '' });
+  const [incomeForm, setIncomeForm] = useState({ tanggal: '', kategori: incomeCategories[0], namaPemasukan: '', jumlah: 0, rekeningId: '', catatan: '' });
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true);
+      
+      const { data: salesData } = await supabase.from('kabung_sales').select('*');
+      const { data: purchasesData } = await supabase.from('kabung_purchases').select('*');
+      const { data: expensesData } = await supabase.from('kabung_expenses').select('*');
+      const { data: incomesData } = await supabase.from('kabung_incomes').select('*');
+      const { data: accountsData } = await supabase.from('kabung_accounts').select('*');
+
+      setSales(salesData || []);
+      setPurchases(purchasesData || []);
+      setExpenses(expensesData || []);
+      setIncomes(incomesData || []);
+      setAccounts(accountsData || []);
+
+      if (accountsData?.length > 0) {
+        const firstId = accountsData[0].id;
+        setExpenseForm(prev => ({ ...prev, rekeningId: firstId }));
+        setIncomeForm(prev => ({ ...prev, rekeningId: firstId }));
+      }
+    } catch (error) {
+      console.error('Error fetching financial data:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // --- HANDLERS FOR PENGELUARAN ---
   const handleOpenExpenseModal = (exp = null) => {
     if (exp) {
       setEditingId(exp.id);
-      setExpenseForm(exp);
+      setExpenseForm({
+        tanggal: exp.tanggal,
+        kategori: exp.kategori,
+        namaPengeluaran: exp.nama_pengeluaran,
+        jumlah: exp.jumlah,
+        rekeningId: exp.rekening_id,
+        catatan: exp.catatan || ''
+      });
     } else {
       setEditingId(null);
-      setExpenseForm({ tanggal: new Date().toISOString().split('T')[0], kategori: expenseCategories[0], namaPengeluaran: '', jumlah: 0, rekeningId: accounts.length > 0 ? accounts[0].id : 'kas-tunai', catatan: '' });
+      setExpenseForm({ 
+        tanggal: new Date().toISOString().split('T')[0], 
+        kategori: expenseCategories[0], 
+        namaPengeluaran: '', 
+        jumlah: 0, 
+        rekeningId: accounts.length > 0 ? accounts[0].id : '', 
+        catatan: '' 
+      });
     }
     setIsExpenseModalOpen(true);
   };
 
-  const handleSubmitExpense = (e) => {
+  const handleSubmitExpense = async (e) => {
     e.preventDefault();
-    const newExp = { ...expenseForm, jumlah: Number(expenseForm.jumlah) };
-    if (editingId) setExpenses(expenses.map(x => x.id === editingId ? { ...newExp, id: editingId } : x));
-    else setExpenses([{ ...newExp, id: Date.now() }, ...expenses]);
-    setIsExpenseModalOpen(false);
+    try {
+      setSubmitting(true);
+      const payload = {
+        tanggal: expenseForm.tanggal,
+        kategori: expenseForm.kategori,
+        nama_pengeluaran: expenseForm.namaPengeluaran,
+        jumlah: Number(expenseForm.jumlah),
+        rekening_id: expenseForm.rekeningId,
+        catatan: expenseForm.catatan
+      };
+
+      if (editingId) {
+        const { error } = await supabase.from('kabung_expenses').update(payload).eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('kabung_expenses').insert([payload]);
+        if (error) throw error;
+      }
+
+      await fetchInitialData();
+      setIsExpenseModalOpen(false);
+    } catch (error) {
+      alert('Gagal menyimpan: ' + error.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleDeleteExpense = (id) => {
-    if (window.confirm('Yakin hapus pengeluaran ini?')) setExpenses(expenses.filter(x => x.id !== id));
+  const handleDeleteExpense = async (id) => {
+    if (window.confirm('Yakin hapus pengeluaran ini?')) {
+      try {
+        setLoading(true);
+        const { error } = await supabase.from('kabung_expenses').delete().eq('id', id);
+        if (error) throw error;
+        await fetchInitialData();
+      } catch (error) {
+        alert('Gagal menghapus: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   // --- HANDLERS FOR PEMASUKAN ---
   const handleOpenIncomeModal = (inc = null) => {
     if (inc) {
       setEditingId(inc.id);
-      setIncomeForm(inc);
+      setIncomeForm({
+        tanggal: inc.tanggal,
+        kategori: inc.kategori,
+        namaPemasukan: inc.nama_pemasukan,
+        jumlah: inc.jumlah,
+        rekeningId: inc.rekening_id,
+        catatan: inc.catatan || ''
+      });
     } else {
       setEditingId(null);
-      setIncomeForm({ tanggal: new Date().toISOString().split('T')[0], kategori: incomeCategories[0], namaPemasukan: '', jumlah: 0, rekeningId: accounts.length > 0 ? accounts[0].id : 'kas-tunai', catatan: '' });
+      setIncomeForm({ 
+        tanggal: new Date().toISOString().split('T')[0], 
+        kategori: incomeCategories[0], 
+        namaPemasukan: '', 
+        jumlah: 0, 
+        rekeningId: accounts.length > 0 ? accounts[0].id : '', 
+        catatan: '' 
+      });
     }
     setIsIncomeModalOpen(true);
   };
 
-  const handleSubmitIncome = (e) => {
+  const handleSubmitIncome = async (e) => {
     e.preventDefault();
-    const newInc = { ...incomeForm, jumlah: Number(incomeForm.jumlah) };
-    if (editingId) setIncomes(incomes.map(x => x.id === editingId ? { ...newInc, id: editingId } : x));
-    else setIncomes([{ ...newInc, id: Date.now() }, ...incomes]);
-    setIsIncomeModalOpen(false);
+    try {
+      setSubmitting(true);
+      const payload = {
+        tanggal: incomeForm.tanggal,
+        kategori: incomeForm.kategori,
+        nama_pemasukan: incomeForm.namaPemasukan,
+        jumlah: Number(incomeForm.jumlah),
+        rekening_id: incomeForm.rekeningId,
+        catatan: incomeForm.catatan
+      };
+
+      if (editingId) {
+        const { error } = await supabase.from('kabung_incomes').update(payload).eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('kabung_incomes').insert([payload]);
+        if (error) throw error;
+      }
+
+      await fetchInitialData();
+      setIsIncomeModalOpen(false);
+    } catch (error) {
+      alert('Gagal menyimpan: ' + error.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleDeleteIncome = (id) => {
-    if (window.confirm('Yakin hapus pemasukan ini?')) setIncomes(incomes.filter(x => x.id !== id));
+  const handleDeleteIncome = async (id) => {
+    if (window.confirm('Yakin hapus pemasukan ini?')) {
+      try {
+        setLoading(true);
+        const { error } = await supabase.from('kabung_incomes').delete().eq('id', id);
+        if (error) throw error;
+        await fetchInitialData();
+      } catch (error) {
+        alert('Gagal menghapus: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   // --- UNIFIED TRANSACTIONS LIST ---
@@ -76,12 +204,12 @@ export default function AdminFinances() {
     let list = [];
 
     // 1. Sales (Pemasukan)
-    sales.filter(s => s.statusPembayaran === 'Sudah bayar').forEach(s => {
+    sales.filter(s => s.status_pembayaran === 'Sudah bayar').forEach(s => {
       list.push({
         id: `sale-${s.id}`, rawId: s.id, type: 'INCOME', source: 'sale',
         tanggal: s.tanggal, kategori: 'Penjualan Produk',
-        keterangan: `Penjualan: ${s.namaPembeli} (${s.namaProduk})`,
-        jumlah: s.totalPenjualan
+        keterangan: `Penjualan: ${s.nama_pembeli} (${s.nama_produk})`,
+        jumlah: Number(s.total_penjualan)
       });
     });
 
@@ -90,8 +218,8 @@ export default function AdminFinances() {
       list.push({
         id: `pur-${p.id}`, rawId: p.id, type: 'EXPENSE', source: 'purchase',
         tanggal: p.tanggal, kategori: 'Pembelian Stok',
-        keterangan: `Restock: ${p.namaProduk} dari ${p.namaPetani}`,
-        jumlah: p.hargaBeliTotal
+        keterangan: `Restock: ${p.nama_produk} dari ${p.nama_petani}`,
+        jumlah: Number(p.harga_beli_total)
       });
     });
 
@@ -100,8 +228,8 @@ export default function AdminFinances() {
       list.push({
         id: `inc-${i.id}`, rawId: i.id, type: 'INCOME', source: 'manual_inc',
         tanggal: i.tanggal, kategori: i.kategori,
-        keterangan: i.namaPemasukan,
-        jumlah: i.jumlah, rawData: i
+        keterangan: i.nama_pemasukan,
+        jumlah: Number(i.jumlah), rawData: i
       });
     });
 
@@ -110,8 +238,8 @@ export default function AdminFinances() {
       list.push({
         id: `exp-${e.id}`, rawId: e.id, type: 'EXPENSE', source: 'manual_exp',
         tanggal: e.tanggal, kategori: e.kategori,
-        keterangan: e.namaPengeluaran,
-        jumlah: e.jumlah, rawData: e
+        keterangan: e.nama_pengeluaran,
+        jumlah: Number(e.jumlah), rawData: e
       });
     });
 
@@ -228,16 +356,23 @@ export default function AdminFinances() {
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-brown/10">
-              {allTransactions.map((t) => (
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-12 text-center">
+                    <Loader2 className="w-8 h-8 text-brand-gold animate-spin mx-auto mb-2" />
+                    <span className="text-sm text-brand-brown/40">Memuat data keuangan...</span>
+                  </td>
+                </tr>
+              ) : allTransactions.map((t) => (
                 <tr key={t.id} className="hover:bg-brand-brown/[0.02]">
                   <td className="px-6 py-4 text-sm text-brand-brown whitespace-nowrap">{t.tanggal}</td>
                   <td className="px-6 py-4">
                     <div className="font-medium text-brand-brown">{t.keterangan}</div>
                     <div className="flex gap-2 items-center mt-1">
                       <div className="text-xs inline-block px-2 py-0.5 bg-brand-brown/10 text-brand-brown rounded-full">{t.kategori}</div>
-                      {t.rawData && t.rawData.rekeningId && (
+                      {t.rawData && t.rawData.rekening_id && (
                         <div className="text-xs inline-block px-2 py-0.5 border border-brand-brown/20 text-brand-brown/50 rounded-full">
-                          {accounts.find(a => a.id === t.rawData.rekeningId)?.namaRekening || 'Kas'}
+                          {accounts.find(a => a.id === t.rawData.rekening_id)?.nama_rekening || 'Kas'}
                         </div>
                       )}
                     </div>
@@ -267,7 +402,7 @@ export default function AdminFinances() {
                   </td>
                 </tr>
               ))}
-              {allTransactions.length === 0 && (
+              {!loading && allTransactions.length === 0 && (
                 <tr>
                   <td colSpan="5" className="px-6 py-8 text-center text-brand-brown/40">Belum ada transaksi di bulan ini.</td>
                 </tr>
@@ -292,10 +427,21 @@ export default function AdminFinances() {
               <div>
                 <label className="block text-sm font-medium mb-1">Potong dari Rekening/Kas *</label>
                 <select required value={expenseForm.rekeningId} onChange={e => setExpenseForm({...expenseForm, rekeningId: e.target.value})} className="w-full px-3 py-2 border rounded-xl">
-                  {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.namaRekening}</option>)}
+                  <option value="">-- Pilih Rekening --</option>
+                  {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.nama_rekening}</option>)}
                 </select>
               </div>
-              <div className="pt-4 border-t mt-4 flex justify-end gap-3"><button type="button" onClick={()=>setIsExpenseModalOpen(false)} className="px-4 py-2 hover:bg-gray-100 rounded-xl">Batal</button><button type="submit" className="px-4 py-2 bg-red-600 text-white rounded-xl">Simpan</button></div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-1">Catatan</label>
+                <textarea rows="2" value={expenseForm.catatan} onChange={e => setExpenseForm({...expenseForm, catatan: e.target.value})} className="w-full px-3 py-2 border rounded-xl"></textarea>
+              </div>
+              <div className="pt-4 border-t mt-4 flex justify-end gap-3">
+                <button type="button" onClick={()=>setIsExpenseModalOpen(false)} className="px-4 py-2 hover:bg-gray-100 rounded-xl" disabled={submitting}>Batal</button>
+                <button type="submit" className="px-4 py-2 bg-red-600 text-white rounded-xl flex items-center gap-2" disabled={submitting}>
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {submitting ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -316,10 +462,21 @@ export default function AdminFinances() {
               <div>
                 <label className="block text-sm font-medium mb-1">Masuk ke Rekening/Kas *</label>
                 <select required value={incomeForm.rekeningId} onChange={e => setIncomeForm({...incomeForm, rekeningId: e.target.value})} className="w-full px-3 py-2 border rounded-xl">
-                  {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.namaRekening}</option>)}
+                  <option value="">-- Pilih Rekening --</option>
+                  {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.nama_rekening}</option>)}
                 </select>
               </div>
-              <div className="pt-4 border-t mt-4 flex justify-end gap-3"><button type="button" onClick={()=>setIsIncomeModalOpen(false)} className="px-4 py-2 hover:bg-gray-100 rounded-xl">Batal</button><button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-xl">Simpan</button></div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-1">Catatan</label>
+                <textarea rows="2" value={incomeForm.catatan} onChange={e => setIncomeForm({...incomeForm, catatan: e.target.value})} className="w-full px-3 py-2 border rounded-xl"></textarea>
+              </div>
+              <div className="pt-4 border-t mt-4 flex justify-end gap-3">
+                <button type="button" onClick={()=>setIsIncomeModalOpen(false)} className="px-4 py-2 hover:bg-gray-100 rounded-xl" disabled={submitting}>Batal</button>
+                <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-xl flex items-center gap-2" disabled={submitting}>
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {submitting ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
