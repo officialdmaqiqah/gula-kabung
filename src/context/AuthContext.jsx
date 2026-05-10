@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
   }, [location.pathname, navigate]);
 
   const login = (username, password) => {
-    if (username === 'gulakabung' && password === 'kabung2024') {
+    if (username === 'mydetti' && password === 'salfanun') {
       localStorage.setItem('kabungmart_admin_auth', 'true');
       setIsAuthenticated(true);
       navigate('/admin/dashboard');
