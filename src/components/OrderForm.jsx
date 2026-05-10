@@ -3,6 +3,7 @@ import { Send, User, Phone, MapPin, MessageSquare, Loader2, CheckCircle2 } from 
 import { useCart } from '../context/CartContext';
 import { supabase } from '../lib/supabase';
 import { formatRupiah } from '../utils/format';
+import { toast } from 'react-hot-toast';
 
 export default function OrderForm() {
   const { cart, getCartTotal, clearCart } = useCart();
@@ -33,8 +34,12 @@ export default function OrderForm() {
   }, []);
 
   const fetchSettings = async () => {
-    const { data } = await supabase.from('kabung_settings').select('whatsapp').eq('id', 'main').single();
-    if (data) setSiteSettings(data);
+    try {
+      const { data } = await supabase.from('kabung_settings').select('whatsapp').eq('id', 'main').single();
+      if (data) setSiteSettings(data);
+    } catch (error) {
+      console.error('Error fetching settings:', error.message);
+    }
   };
 
   // Fetch Regencies when Province changes
@@ -86,7 +91,10 @@ export default function OrderForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (cart.length === 0) return alert('Keranjang belanja Anda masih kosong.');
+    if (cart.length === 0) {
+      toast.error('Keranjang belanja Anda masih kosong.');
+      return;
+    }
 
     if (validate()) {
       try {
@@ -98,10 +106,13 @@ export default function OrderForm() {
           tanggal: new Date().toISOString().split('T')[0],
           nama_pembeli: formData.name,
           nama_produk: item.name,
-          jumlah_terjual: item.quantity,
+          produk_id: item.id,
+          jumlah: item.quantity,
+          harga_satuan: item.price,
           total_penjualan: item.price * item.quantity,
           status_pembayaran: 'Belum bayar',
-          rekening_id: null // Will be assigned by admin when paid
+          rekening_id: null,
+          catatan: formData.notes || '-'
         }));
 
         const { error } = await supabase.from('kabung_sales').insert(salesEntries);
@@ -117,13 +128,15 @@ export default function OrderForm() {
         const waUrl = `https://wa.me/${siteSettings.whatsapp}?text=${encodeURIComponent(message)}`;
         
         setIsSuccess(true);
+        toast.success('Pesanan berhasil dibuat!');
+        
         setTimeout(() => {
           window.open(waUrl, '_blank');
           clearCart();
         }, 1500);
 
       } catch (error) {
-        alert('Gagal mengirim pesanan: ' + error.message);
+        toast.error('Gagal mengirim pesanan: ' + error.message);
       } finally {
         setSubmitting(false);
       }

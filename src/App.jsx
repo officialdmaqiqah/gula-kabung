@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import Header from './components/Header';
 import LandingPage from './pages/LandingPage';
 import CatalogPage from './pages/CatalogPage';
@@ -25,6 +26,38 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col font-sans">
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#58372B',
+            color: '#fff',
+            borderRadius: '16px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            padding: '16px 24px',
+            border: '1px solid rgba(223, 173, 91, 0.2)',
+          },
+          success: {
+            iconTheme: {
+              primary: '#DFAD5B',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            style: {
+              background: '#fff',
+              color: '#58372B',
+              border: '1px solid #fee2e2',
+            },
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          }
+        }}
+      />
       {!isAdmin && <Header />}
       <main className="flex-grow">
         <AuthProvider>

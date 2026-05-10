@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
 import { Plus, Edit, Trash2, Users, CreditCard, Truck, Settings, Loader2, Save } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 export default function AdminSettings() {
   const [activeTab, setActiveTab] = useState('investor');
@@ -88,10 +89,11 @@ export default function AdminSettings() {
       if (error) throw error;
       
       setSaveStatus('Berhasil disimpan!');
+      toast.success('Pengaturan website berhasil disimpan!');
       setTimeout(() => setSaveStatus(''), 3000);
       await fetchInitialData();
     } catch (error) {
-      alert('Gagal menyimpan: ' + error.message);
+      toast.error('Gagal menyimpan: ' + error.message);
     } finally {
       setSubmitting(false);
     }
@@ -154,8 +156,9 @@ export default function AdminSettings() {
 
       await fetchInitialData();
       setIsModalOpen(false);
+      toast.success('Data berhasil disimpan!');
     } catch (error) {
-      alert('Gagal menyimpan: ' + error.message);
+      toast.error('Gagal menyimpan: ' + error.message);
     } finally {
       setSubmitting(false);
     }
@@ -178,8 +181,9 @@ export default function AdminSettings() {
         await supabase.from('kabung_suppliers').delete().eq('id', id);
       }
       await fetchInitialData();
+      toast.success('Data berhasil dihapus!');
     } catch (error) {
-      alert('Gagal menghapus: ' + error.message);
+      toast.error('Gagal menghapus: ' + error.message);
     } finally {
       setLoading(false);
     }

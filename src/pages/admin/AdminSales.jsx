@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Edit, Trash2, Search, Filter, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
+import { toast } from 'react-hot-toast';
 
 export default function AdminSales() {
   const [sales, setSales] = useState([]);
@@ -63,7 +64,7 @@ export default function AdminSales() {
       }
     } catch (error) {
       console.error('Error fetching sales data:', error.message);
-      alert('Gagal mengambil data: ' + error.message);
+      toast.error('Gagal mengambil data: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -89,7 +90,8 @@ export default function AdminSales() {
         jumlah: sale.jumlah,
         hargaSatuan: sale.harga_satuan,
         metodePembayaran: sale.metode_pembayaran,
-        rekeningId: sale.rekening_id,
+        rekening_id: sale.rekening_id, // Gunakan rekening_id
+        rekeningId: sale.rekening_id, // Alias untuk form
         statusPembayaran: sale.status_pembayaran,
         channelPenjualan: sale.channel_penjualan,
         catatan: sale.catatan || '',
@@ -116,7 +118,7 @@ export default function AdminSales() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.produkId) return alert('Pilih produk!');
+    if (!formData.produkId) return toast.error('Pilih produk!');
     
     try {
       setSubmitting(true);
@@ -151,6 +153,7 @@ export default function AdminSales() {
             }).eq('id', formData.produkId);
           }
         }
+        toast.success('Transaksi diperbarui!');
       } else {
         const { error } = await supabase.from('kabung_sales').insert([payload]);
         if (error) throw error;
@@ -162,12 +165,13 @@ export default function AdminSales() {
             stok: product.stok - Number(formData.jumlah) 
           }).eq('id', formData.produkId);
         }
+        toast.success('Transaksi penjualan berhasil dicatat!');
       }
 
       await fetchInitialData();
       setIsModalOpen(false);
     } catch (error) {
-      alert('Gagal menyimpan: ' + error.message);
+      toast.error('Gagal menyimpan: ' + error.message);
     } finally {
       setSubmitting(false);
     }
@@ -193,8 +197,9 @@ export default function AdminSales() {
         if (error) throw error;
         
         await fetchInitialData();
+        toast.success('Transaksi berhasil dihapus dan stok dikembalikan.');
       } catch (error) {
-        alert('Gagal menghapus: ' + error.message);
+        toast.error('Gagal menghapus: ' + error.message);
       } finally {
         setLoading(false);
       }

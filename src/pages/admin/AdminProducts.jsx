@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
+import { toast } from 'react-hot-toast';
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
@@ -47,7 +48,7 @@ export default function AdminProducts() {
       setProducts(mappedData);
     } catch (error) {
       console.error('Error fetching products:', error.message);
-      alert('Gagal mengambil data produk: ' + error.message);
+      toast.error('Gagal mengambil data produk: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -91,19 +92,21 @@ export default function AdminProducts() {
           .eq('id', editingId);
         
         if (error) throw error;
+        toast.success('Produk berhasil diperbarui!');
       } else {
         const { error } = await supabase
           .from('kabung_products')
           .insert([payload]);
         
         if (error) throw error;
+        toast.success('Produk baru berhasil ditambahkan!');
       }
 
       await fetchProducts();
       setIsModalOpen(false);
     } catch (error) {
       console.error('Error saving product:', error.message);
-      alert('Gagal menyimpan produk: ' + error.message);
+      toast.error('Gagal menyimpan produk: ' + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -113,7 +116,7 @@ export default function AdminProducts() {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) { // 2MB limit
-        alert('File terlalu besar. Gunakan foto di bawah 2MB untuk performa terbaik.');
+        toast.error('File terlalu besar. Gunakan foto di bawah 2MB.');
         return;
       }
       const reader = new FileReader();
@@ -135,9 +138,10 @@ export default function AdminProducts() {
       
       setProducts(prev => prev.filter(p => p.id !== id));
       setDeletingId(null);
+      toast.success('Produk berhasil dihapus!');
     } catch (error) {
       console.error('Error deleting product:', error.message);
-      alert('Gagal menghapus produk: ' + error.message);
+      toast.error('Gagal menghapus produk: ' + error.message);
     }
   };
 
