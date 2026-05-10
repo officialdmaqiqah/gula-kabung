@@ -1,17 +1,45 @@
-import React, { useMemo } from 'react';
-import { useLocalStorage } from '../../hooks/useLocalStorage';
+import React, { useState, useEffect, useMemo } from 'react';
+import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
-import { TrendingUp, TrendingDown, DollarSign, ShoppingBag, AlertTriangle, Package } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, ShoppingBag, AlertTriangle, Package, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function AdminDashboard() {
-  const [sales] = useLocalStorage('kabungmart_sales', []);
-  const [expenses] = useLocalStorage('kabungmart_expenses', []);
-  const [purchases] = useLocalStorage('kabungmart_purchases', []);
-  const [incomes] = useLocalStorage('kabungmart_incomes', []);
-  const [products] = useLocalStorage('kabungmart_products', []);
+  const navigate = useNavigate();
+  const [sales, setSales] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+  const [incomes, setIncomes] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const today = new Date().toISOString().split('T')[0];
   const thisMonth = today.substring(0, 7); // YYYY-MM
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const { data: salesData } = await supabase.from('kabung_sales').select('*');
+      const { data: expensesData } = await supabase.from('kabung_expenses').select('*');
+      const { data: purchasesData } = await supabase.from('kabung_purchases').select('*');
+      const { data: incomesData } = await supabase.from('kabung_incomes').select('*');
+      const { data: productsData } = await supabase.from('kabung_products').select('*');
+
+      setSales(salesData || []);
+      setExpenses(expensesData || []);
+      setPurchases(purchasesData || []);
+      setIncomes(incomesData || []);
+      setProducts(productsData || []);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const {
     salesToday,
@@ -26,10 +54,11 @@ export default function AdminDashboard() {
     let txCount = 0;
 
     sales.forEach(sale => {
-      if (sale.statusPembayaran === 'Sudah bayar') {
-        if (sale.tanggal === today) sToday += sale.totalPenjualan;
+      if (sale.status_pembayaran === 'Sudah bayar') {
+        const total = Number(sale.total_penjualan);
+        if (sale.tanggal === today) sToday += total;
         if (sale.tanggal.startsWith(thisMonth)) {
-          sMonth += sale.totalPenjualan;
+          sMonth += total;
           txCount++;
         }
       }
@@ -37,20 +66,21 @@ export default function AdminDashboard() {
 
     expenses.forEach(exp => {
       if (exp.tanggal.startsWith(thisMonth)) {
-        eMonth += exp.jumlah;
+        eMonth += Number(exp.jumlah);
       }
     });
 
     purchases.forEach(p => {
       if (p.tanggal.startsWith(thisMonth)) {
-        eMonth += p.hargaBeliTotal;
+        eMonth += Number(p.harga_beli_total);
       }
     });
 
     incomes.forEach(i => {
-      if (i.tanggal === today) sToday += i.jumlah;
+      const total = Number(i.jumlah);
+      if (i.tanggal === today) sToday += total;
       if (i.tanggal.startsWith(thisMonth)) {
-        sMonth += i.jumlah;
+        sMonth += total;
       }
     });
 
@@ -64,20 +94,27 @@ export default function AdminDashboard() {
   }, [sales, expenses, purchases, incomes, today, thisMonth]);
 
   const lowStockProducts = useMemo(() => {
-    return products.filter(p => p.stok <= 5);
+    return products.filter(p => Number(p.stok) <= 5);
   }, [products]);
 
-  const isProfit = profitLoss >= 0;
+  if (loading) {
+    return (
+      <div className="h-[80vh] flex flex-col items-center justify-center text-brand-brown">
+        <Loader2 className="w-16 h-16 text-brand-gold animate-spin mb-4" />
+        <p className="font-bold uppercase tracking-[0.2em]">Memuat Dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10 pb-12">
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {[
-          { label: 'Pemasukan Hari Ini', value: formatRupiah(salesToday), icon: DollarSign, color: 'emerald', trend: '+12.5%' },
-          { label: 'Pemasukan Bulan Ini', value: formatRupiah(salesThisMonth), icon: TrendingUp, color: 'brand-gold', trend: '+8.2%' },
-          { label: 'Pengeluaran Bulan Ini', value: formatRupiah(expensesThisMonth), icon: TrendingDown, color: 'rose', trend: '-2.4%' },
-          { label: 'Transaksi Bulan Ini', value: txCountThisMonth, icon: ShoppingBag, color: 'indigo', trend: '+5' },
+          { label: 'Pemasukan Hari Ini', value: formatRupiah(salesToday), icon: DollarSign, color: 'emerald', trend: '+Live' },
+          { label: 'Pemasukan Bulan Ini', value: formatRupiah(salesThisMonth), icon: TrendingUp, color: 'brand-gold', trend: 'Realtime' },
+          { label: 'Pengeluaran Bulan Ini', value: formatRupiah(expensesThisMonth), icon: TrendingDown, color: 'rose', trend: 'Budget' },
+          { label: 'Transaksi Bulan Ini', value: txCountThisMonth, icon: ShoppingBag, color: 'indigo', trend: 'Sales' },
         ].map((stat, i) => {
           const colorMap = {
             emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-emerald-100',
@@ -175,18 +212,18 @@ export default function AdminDashboard() {
                 <div key={p.id} className="group p-5 bg-white border border-brand-brown/5 rounded-2xl hover:border-brand-gold/30 hover:shadow-lg transition-all duration-500">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-brand-brown/5 rounded-2xl flex items-center justify-center overflow-hidden group-hover:scale-110 transition-transform duration-500">
-                      {p.imageUrl ? (
-                        <img src={p.imageUrl} alt={p.namaProduk} className="w-full h-full object-cover" />
+                      {p.image_url ? (
+                        <img src={p.image_url} alt={p.nama_produk} className="w-full h-full object-cover" />
                       ) : (
                         <Package className="w-7 h-7 text-brand-brown/10" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-brand-brown truncate group-hover:text-brand-gold transition-colors">{p.namaProduk}</p>
+                      <p className="font-bold text-brand-brown truncate group-hover:text-brand-gold transition-colors">{p.nama_produk}</p>
                       <p className="text-[10px] text-brand-brown/40 font-bold uppercase tracking-widest">{p.ukuran}</p>
                     </div>
                     <div className="text-right">
-                      <p className={`text-xl font-black ${p.stok === 0 ? 'text-rose-500' : 'text-brand-gold'}`}>
+                      <p className={`text-xl font-black ${Number(p.stok) === 0 ? 'text-rose-500' : 'text-brand-gold'}`}>
                         {p.stok}
                       </p>
                       <p className="text-[10px] font-bold text-brand-brown/20 uppercase">{p.satuan}</p>
@@ -205,7 +242,10 @@ export default function AdminDashboard() {
             )}
           </div>
           
-          <button className="mt-8 w-full py-4 bg-brand-brown text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-brand-gold transition-all shadow-lg shadow-brand-brown/10">
+          <button 
+            onClick={() => navigate('/admin/products')}
+            className="mt-8 w-full py-4 bg-brand-brown text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-brand-gold transition-all shadow-lg shadow-brand-brown/10"
+          >
             Manajemen Produk
           </button>
         </div>
