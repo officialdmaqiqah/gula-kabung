@@ -1,21 +1,23 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
-import { Plus, Edit, Trash2, Users, CreditCard, Truck, Settings } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, CreditCard, Truck, Settings, Loader2, Save } from 'lucide-react';
 
 export default function AdminSettings() {
   const [activeTab, setActiveTab] = useState('investor');
 
-  const [investors, setInvestors] = useLocalStorage('kabungmart_investors', []);
-  const [accounts, setAccounts] = useLocalStorage('kabungmart_accounts', [{ id: 'kas-tunai', namaRekening: 'Kas Tunai', saldoAwal: 0 }]);
-  const [suppliers, setSuppliers] = useLocalStorage('kabungmart_suppliers', []);
+  const [investors, setInvestors] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [siteSettings, setSiteSettings] = useState({ hero_image: '', whatsapp: '6281234567890' });
 
-  const [sales] = useLocalStorage('kabungmart_sales', []);
-  const [purchases] = useLocalStorage('kabungmart_purchases', []);
-  const [incomes, setIncomes] = useLocalStorage('kabungmart_incomes', []);
-  const [expenses] = useLocalStorage('kabungmart_expenses', []);
-  const [siteSettings, setSiteSettings] = useLocalStorage('kabungmart_settings', { heroImage: '', whatsapp: '6281234567890' });
+  const [sales, setSales] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+  const [incomes, setIncomes] = useState([]);
+  const [expenses, setExpenses] = useState([]);
 
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   
@@ -24,13 +26,47 @@ export default function AdminSettings() {
   const [saveStatus, setSaveStatus] = useState('');
 
   useEffect(() => {
-    setLocalSiteSettings(siteSettings);
-  }, [siteSettings]);
+    fetchInitialData();
+  }, []);
+
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true);
+      const { data: investorsData } = await supabase.from('kabung_investors').select('*');
+      const { data: accountsData } = await supabase.from('kabung_accounts').select('*');
+      const { data: suppliersData } = await supabase.from('kabung_suppliers').select('*');
+      const { data: settingsData } = await supabase.from('kabung_settings').select('*').eq('id', 'main').single();
+      
+      const { data: salesData } = await supabase.from('kabung_sales').select('total_penjualan, rekening_id, status_pembayaran');
+      const { data: purchasesData } = await supabase.from('kabung_purchases').select('harga_beli_total, rekening_id');
+      const { data: incomesData } = await supabase.from('kabung_incomes').select('jumlah, rekening_id');
+      const { data: expensesData } = await supabase.from('kabung_expenses').select('jumlah, rekening_id');
+
+      setInvestors(investorsData || []);
+      setAccounts(accountsData || []);
+      setSuppliers(suppliersData || []);
+      if (settingsData) {
+        setSiteSettings(settingsData);
+        setLocalSiteSettings(settingsData);
+      }
+      
+      setSales(salesData || []);
+      setPurchases(purchasesData || []);
+      setIncomes(incomesData || []);
+      setExpenses(expensesData || []);
+    } catch (error) {
+      console.error('Error fetching settings data:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenModal = (item = null) => {
     if (item) {
       setEditingId(item.id);
-      setFormData(item);
+      if (activeTab === 'investor') setFormData({ nama: item.nama, modal: item.modal, persentase: item.persentase });
+      else if (activeTab === 'account') setFormData({ namaRekening: item.nama_rekening, nomorRekening: item.nomor_rekening, atasNama: item.atas_nama, saldoAwal: item.saldo_awal });
+      else if (activeTab === 'supplier') setFormData({ namaPetani: item.nama_petani, kontak: item.kontak, alamat: item.alamat });
     } else {
       setEditingId(null);
       if (activeTab === 'investor') setFormData({ nama: '', modal: 0, persentase: 0 });
@@ -40,104 +76,135 @@ export default function AdminSettings() {
     setIsModalOpen(true);
   };
 
-  const handleSaveWebsiteSettings = () => {
-    setSiteSettings(localSiteSettings);
-    setSaveStatus('Berhasil disimpan!');
-    setTimeout(() => setSaveStatus(''), 3000);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    if (activeTab === 'investor') {
-      const modalValue = Number(formData.modal);
-      const newItem = { ...formData, modal: modalValue, persentase: Number(formData.persentase) };
+  const handleSaveWebsiteSettings = async () => {
+    try {
+      setSubmitting(true);
+      const { error } = await supabase.from('kabung_settings').upsert({
+        id: 'main',
+        hero_image: localSiteSettings.hero_image,
+        whatsapp: localSiteSettings.whatsapp,
+        updated_at: new Date().toISOString()
+      });
+      if (error) throw error;
       
-      let updatedIncomes = [...incomes];
-      
-      if (editingId) {
-        // If editing, find the income record and update
-        const existingInvestor = investors.find(inv => inv.id === editingId);
-        if (existingInvestor && existingInvestor.incomeId) {
-          updatedIncomes = updatedIncomes.map(inc => 
-            inc.id === existingInvestor.incomeId 
-              ? { ...inc, jumlah: modalValue, namaPemasukan: `Setoran Modal: ${newItem.nama}` } 
-              : inc
-          );
-        }
-        setIncomes(updatedIncomes);
-        setInvestors(investors.map(inv => inv.id === editingId ? { ...newItem, id: editingId } : inv));
-      } else {
-        // New investor, create income
-        const incomeId = Date.now() + 1;
-        const newIncome = {
-          id: incomeId,
-          tanggal: new Date().toISOString().split('T')[0],
-          kategori: 'Modal Awal',
-          namaPemasukan: `Setoran Modal: ${newItem.nama}`,
-          jumlah: modalValue,
-          rekeningId: accounts.length > 0 ? accounts[0].id : '', // default to first account
-          catatan: 'Otomatis dari Master Data Investor'
-        };
-        setIncomes([newIncome, ...incomes]);
-        setInvestors([{ ...newItem, id: Date.now(), incomeId }, ...investors]);
-      }
-    } 
-    else if (activeTab === 'account') {
-      const newItem = { ...formData, saldoAwal: Number(formData.saldoAwal) };
-      if (editingId) setAccounts(accounts.map(acc => acc.id === editingId ? { ...newItem, id: editingId } : acc));
-      else setAccounts([...accounts, { ...newItem, id: `acc-${Date.now()}` }]);
-    } 
-    else if (activeTab === 'supplier') {
-      if (editingId) setSuppliers(suppliers.map(sup => sup.id === editingId ? { ...formData, id: editingId } : sup));
-      else setSuppliers([...suppliers, { ...formData, id: `sup-${Date.now()}` }]);
+      setSaveStatus('Berhasil disimpan!');
+      setTimeout(() => setSaveStatus(''), 3000);
+      await fetchInitialData();
+    } catch (error) {
+      alert('Gagal menyimpan: ' + error.message);
+    } finally {
+      setSubmitting(false);
     }
-
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+
+      if (activeTab === 'investor') {
+        const payload = {
+          nama: formData.nama,
+          modal: Number(formData.modal),
+          persentase: Number(formData.persentase)
+        };
+        
+        if (editingId) {
+          const { error } = await supabase.from('kabung_investors').update(payload).eq('id', editingId);
+          if (error) throw error;
+        } else {
+          // New investor, create income automatically
+          const { data: newInc, error: incError } = await supabase.from('kabung_incomes').insert([{
+            tanggal: new Date().toISOString().split('T')[0],
+            kategori: 'Modal Awal',
+            nama_pemasukan: `Setoran Modal: ${payload.nama}`,
+            jumlah: payload.modal,
+            rekening_id: accounts.length > 0 ? accounts[0].id : null,
+            catatan: 'Otomatis dari Master Data Investor'
+          }]).select();
+          
+          if (incError) throw incError;
+          
+          const { error } = await supabase.from('kabung_investors').insert([{
+            ...payload,
+            income_id: newInc[0].id
+          }]);
+          if (error) throw error;
+        }
+      } 
+      else if (activeTab === 'account') {
+        const payload = {
+          nama_rekening: formData.namaRekening,
+          nomor_rekening: formData.nomorRekening,
+          atas_nama: formData.atasNama,
+          saldo_awal: Number(formData.saldoAwal)
+        };
+        if (editingId) await supabase.from('kabung_accounts').update(payload).eq('id', editingId);
+        else await supabase.from('kabung_accounts').insert([payload]);
+      } 
+      else if (activeTab === 'supplier') {
+        const payload = {
+          nama_petani: formData.namaPetani,
+          kontak: formData.kontak,
+          alamat: formData.alamat
+        };
+        if (editingId) await supabase.from('kabung_suppliers').update(payload).eq('id', editingId);
+        else await supabase.from('kabung_suppliers').insert([payload]);
+      }
+
+      await fetchInitialData();
+      setIsModalOpen(false);
+    } catch (error) {
+      alert('Gagal menyimpan: ' + error.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
     if (!window.confirm('Yakin ingin menghapus data ini?')) return;
     
-    if (activeTab === 'investor') {
-      const invToDelete = investors.find(inv => inv.id === id);
-      if (invToDelete && invToDelete.incomeId) {
-        setIncomes(incomes.filter(inc => inc.id !== invToDelete.incomeId));
+    try {
+      setLoading(true);
+      if (activeTab === 'investor') {
+        const inv = investors.find(i => i.id === id);
+        if (inv?.income_id) await supabase.from('kabung_incomes').delete().eq('id', inv.income_id);
+        await supabase.from('kabung_investors').delete().eq('id', id);
+      } else if (activeTab === 'account') {
+        const acc = accounts.find(a => a.id === id);
+        if (acc?.nama_rekening === 'Kas Tunai') return alert('Kas Tunai tidak bisa dihapus.');
+        await supabase.from('kabung_accounts').delete().eq('id', id);
+      } else if (activeTab === 'supplier') {
+        await supabase.from('kabung_suppliers').delete().eq('id', id);
       }
-      setInvestors(investors.filter(inv => inv.id !== id));
-    } else if (activeTab === 'account') {
-      if (id === 'kas-tunai') return alert('Kas Tunai bawaan tidak bisa dihapus.');
-      setAccounts(accounts.filter(acc => acc.id !== id));
-    } else if (activeTab === 'supplier') {
-      setSuppliers(suppliers.filter(sup => sup.id !== id));
+      await fetchInitialData();
+    } catch (error) {
+      alert('Gagal menghapus: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   const calculateAccountBalances = useMemo(() => {
     const balances = {};
-    // initialize
     accounts.forEach(acc => {
-      balances[acc.id] = acc.saldoAwal || 0;
+      balances[acc.id] = Number(acc.saldo_awal) || 0;
     });
 
-    // Sales (+)
-    sales.filter(s => s.statusPembayaran === 'Sudah bayar' && s.rekeningId).forEach(s => {
-      if (balances[s.rekeningId] !== undefined) balances[s.rekeningId] += s.totalPenjualan;
+    sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.rekening_id).forEach(s => {
+      if (balances[s.rekening_id] !== undefined) balances[s.rekening_id] += Number(s.total_penjualan);
     });
 
-    // Incomes (+)
-    incomes.filter(i => i.rekeningId).forEach(i => {
-      if (balances[i.rekeningId] !== undefined) balances[i.rekeningId] += i.jumlah;
+    incomes.filter(i => i.rekening_id).forEach(i => {
+      if (balances[i.rekening_id] !== undefined) balances[i.rekening_id] += Number(i.jumlah);
     });
 
-    // Purchases (-)
-    purchases.filter(p => p.rekeningId).forEach(p => {
-      if (balances[p.rekeningId] !== undefined) balances[p.rekeningId] -= p.hargaBeliTotal;
+    purchases.filter(p => p.rekening_id).forEach(p => {
+      if (balances[p.rekening_id] !== undefined) balances[p.rekening_id] -= Number(p.harga_beli_total);
     });
 
-    // Expenses (-)
-    expenses.filter(e => e.rekeningId).forEach(e => {
-      if (balances[e.rekeningId] !== undefined) balances[e.rekeningId] -= e.jumlah;
+    expenses.filter(e => e.rekening_id).forEach(e => {
+      if (balances[e.rekening_id] !== undefined) balances[e.rekening_id] -= Number(e.jumlah);
     });
 
     return balances;
@@ -177,15 +244,19 @@ export default function AdminSettings() {
           )}
         </div>
         
-        
-        {activeTab === 'website' ? (
+        {loading ? (
+          <div className="p-20 text-center">
+            <Loader2 className="w-12 h-12 text-brand-gold animate-spin mx-auto mb-4" />
+            <p className="text-brand-brown/50 font-medium">Memuat data master...</p>
+          </div>
+        ) : activeTab === 'website' ? (
           <div className="p-10 max-w-2xl">
             <div className="mb-12">
               <label className="block text-sm font-black text-brand-brown uppercase tracking-widest mb-4">Hero Image (Halaman Depan)</label>
               <div className="flex flex-col gap-6">
                 <div className="relative w-full aspect-[16/9] rounded-3xl overflow-hidden bg-brand-brown/5 border-2 border-dashed border-brand-brown/10 flex items-center justify-center">
-                  {localSiteSettings.heroImage ? (
-                    <img src={localSiteSettings.heroImage} alt="Hero Preview" className="w-full h-full object-cover" />
+                  {localSiteSettings.hero_image ? (
+                    <img src={localSiteSettings.hero_image} alt="Hero Preview" className="w-full h-full object-cover" />
                   ) : (
                     <div className="text-center p-8">
                       <Plus className="w-12 h-12 text-brand-brown/10 mx-auto mb-2" />
@@ -207,59 +278,51 @@ export default function AdminSettings() {
                         const file = e.target.files[0];
                         if (file) {
                           if (file.size > 2 * 1024 * 1024) {
-                            alert('Ukuran foto terlalu besar. Maksimal 2MB untuk optimasi performa.');
+                            alert('Ukuran foto terlalu besar. Maksimal 2MB.');
                             return;
                           }
                           const reader = new FileReader();
                           reader.onloadend = () => {
-                            setLocalSiteSettings({ ...localSiteSettings, heroImage: reader.result });
+                            setLocalSiteSettings({ ...localSiteSettings, hero_image: reader.result });
                           };
                           reader.readAsDataURL(file);
                         }
                       }}
                     />
                   </label>
-                  {localSiteSettings.heroImage && (
+                  {localSiteSettings.hero_image && (
                     <button 
-                      onClick={() => setLocalSiteSettings({ ...localSiteSettings, heroImage: '' })}
+                      onClick={() => setLocalSiteSettings({ ...localSiteSettings, hero_image: '' })}
                       className="px-6 py-4 border border-rose-100 text-rose-500 hover:bg-rose-50 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all"
                     >
                       Hapus
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] text-brand-brown/40 font-medium italic">
-                  * Foto ini akan muncul sebagai gambar utama di halaman depan website Anda. Gunakan foto berkualitas tinggi untuk hasil terbaik. (Maks 2MB)
-                </p>
               </div>
             </div>
 
             <div className="mb-12">
-              <label className="block text-sm font-black text-brand-brown uppercase tracking-widest mb-4">WhatsApp Admin (Penerima Pesanan)</label>
-              <div className="space-y-4">
-                <input 
-                  type="text" 
-                  value={localSiteSettings.whatsapp || ''} 
-                  onChange={(e) => setLocalSiteSettings({ ...localSiteSettings, whatsapp: e.target.value })}
-                  placeholder="Contoh: 6281234567890"
-                  className="w-full px-6 py-4 rounded-2xl border border-brand-brown/10 bg-brand-brown/[0.02] focus:border-brand-gold outline-none font-bold text-brand-brown"
-                />
-                <p className="text-[10px] text-brand-brown/40 font-medium italic">
-                  * Gunakan format kode negara (62) tanpa tanda + atau spasi. Nomor ini akan terhubung ke semua tombol "Hubungi WhatsApp" di website.
-                </p>
-              </div>
+              <label className="block text-sm font-black text-brand-brown uppercase tracking-widest mb-4">WhatsApp Admin</label>
+              <input 
+                type="text" 
+                value={localSiteSettings.whatsapp || ''} 
+                onChange={(e) => setLocalSiteSettings({ ...localSiteSettings, whatsapp: e.target.value })}
+                placeholder="6281234567890"
+                className="w-full px-6 py-4 rounded-2xl border border-brand-brown/10 bg-brand-brown/[0.02] focus:border-brand-gold outline-none font-bold text-brand-brown"
+              />
             </div>
 
             <div className="pt-8 border-t border-brand-brown/10 flex items-center gap-6">
               <button 
                 onClick={handleSaveWebsiteSettings}
-                className="bg-brand-gold hover:bg-brand-brown text-white hover:text-brand-gold px-10 py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-xl shadow-brand-gold/20"
+                disabled={submitting}
+                className="bg-brand-gold hover:bg-brand-brown text-white hover:text-brand-gold px-10 py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-xl flex items-center gap-2"
               >
-                Simpan Pengaturan
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {submitting ? 'Menyimpan...' : 'Simpan Pengaturan'}
               </button>
-              {saveStatus && (
-                <span className="text-green-600 font-bold text-xs animate-fade-in">{saveStatus}</span>
-              )}
+              {saveStatus && <span className="text-green-600 font-bold text-xs">{saveStatus}</span>}
             </div>
           </div>
         ) : (
@@ -279,7 +342,7 @@ export default function AdminSettings() {
                     <th className="px-6 py-4 text-sm font-semibold text-brand-brown">Nama Rekening/Kas</th>
                     <th className="px-6 py-4 text-sm font-semibold text-brand-brown">No. Rekening</th>
                     <th className="px-6 py-4 text-sm font-semibold text-brand-brown text-right">Saldo Awal</th>
-                    <th className="px-6 py-4 text-sm font-semibold text-brand-brown text-right">Saldo Saat Ini (Real-time)</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-brand-brown text-right">Saldo Saat Ini</th>
                   </>
                 )}
                 {activeTab === 'supplier' && (
@@ -307,35 +370,31 @@ export default function AdminSettings() {
               
               {activeTab === 'account' && accounts.map(acc => (
                 <tr key={acc.id}>
-                  <td className="px-6 py-4">
-                    <div className="font-bold flex items-center gap-2">
-                      <CreditCard className="w-5 h-5 text-brown-400" /> {acc.namaRekening}
-                    </div>
+                  <td className="px-6 py-4 font-bold flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-brown-400" /> {acc.nama_rekening}
                   </td>
                   <td className="px-6 py-4">
-                    {acc.nomorRekening ? (
+                    {acc.nomor_rekening ? (
                       <div>
-                        <div className="font-medium text-brown-900">{acc.nomorRekening}</div>
-                        <div className="text-xs text-brown-500">a.n {acc.atasNama}</div>
+                        <div className="font-medium text-brown-900">{acc.nomor_rekening}</div>
+                        <div className="text-xs text-brown-500">a.n {acc.atas_nama}</div>
                       </div>
-                    ) : (
-                      <span className="text-brown-400 italic">-</span>
-                    )}
+                    ) : <span className="text-brown-400 italic">-</span>}
                   </td>
-                  <td className="px-6 py-4 text-right text-brown-500">{formatRupiah(acc.saldoAwal)}</td>
+                  <td className="px-6 py-4 text-right text-brown-500">{formatRupiah(acc.saldo_awal)}</td>
                   <td className={`px-6 py-4 text-right font-bold text-lg ${calculateAccountBalances[acc.id] < 0 ? 'text-red-600' : 'text-green-600'}`}>
                     {formatRupiah(calculateAccountBalances[acc.id] || 0)}
                   </td>
                   <td className="px-6 py-4 flex justify-end gap-2">
                     <button onClick={() => handleOpenModal(acc)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit className="w-4 h-4" /></button>
-                    {acc.id !== 'kas-tunai' && <button onClick={() => handleDelete(acc.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>}
+                    {acc.nama_rekening !== 'Kas Tunai' && <button onClick={() => handleDelete(acc.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>}
                   </td>
                 </tr>
               ))}
 
               {activeTab === 'supplier' && suppliers.map(sup => (
                 <tr key={sup.id}>
-                  <td className="px-6 py-4 font-medium">{sup.namaPetani}</td>
+                  <td className="px-6 py-4 font-medium">{sup.nama_petani}</td>
                   <td className="px-6 py-4 text-brown-600">{sup.kontak || '-'}</td>
                   <td className="px-6 py-4 text-brown-500 text-sm">{sup.alamat || '-'}</td>
                   <td className="px-6 py-4 flex justify-end gap-2">
@@ -344,14 +403,6 @@ export default function AdminSettings() {
                   </td>
                 </tr>
               ))}
-
-              {((activeTab === 'investor' && investors.length === 0) || 
-                (activeTab === 'account' && accounts.length === 0) || 
-                (activeTab === 'supplier' && suppliers.length === 0)) && (
-                <tr>
-                  <td colSpan="5" className="px-6 py-8 text-center text-brand-brown/40">Belum ada data di menu ini.</td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
@@ -365,22 +416,20 @@ export default function AdminSettings() {
               <h2 className="text-xl font-bold text-brown-900">{editingId ? 'Edit Data' : 'Tambah Data'}</h2>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              
               {activeTab === 'investor' && (
                 <>
                   <div><label className="block text-sm font-medium mb-1">Nama Investor *</label><input required type="text" value={formData.nama} onChange={e=>setFormData({...formData, nama: e.target.value})} className="w-full px-3 py-2 border rounded-xl" /></div>
-                  <div><label className="block text-sm font-medium mb-1">Total Modal Disetor (Rp) *</label><input required type="number" min="0" value={formData.modal} onChange={e=>setFormData({...formData, modal: e.target.value})} className="w-full px-3 py-2 border rounded-xl" /></div>
+                  <div><label className="block text-sm font-medium mb-1">Total Modal (Rp) *</label><input required type="number" min="0" value={formData.modal} onChange={e=>setFormData({...formData, modal: e.target.value})} className="w-full px-3 py-2 border rounded-xl" /></div>
                   <div><label className="block text-sm font-medium mb-1">Persentase Saham (%) *</label><input required type="number" step="0.1" min="0" max="100" value={formData.persentase} onChange={e=>setFormData({...formData, persentase: e.target.value})} className="w-full px-3 py-2 border rounded-xl" /></div>
-                  <p className="text-xs text-brown-500 italic mt-2">* Menyimpan data ini akan otomatis membuat Pemasukan "Modal Awal" di Buku Kas.</p>
                 </>
               )}
 
               {activeTab === 'account' && (
                 <>
-                  <div><label className="block text-sm font-medium mb-1">Nama Rekening/Kas *</label><input required type="text" placeholder="Contoh: BCA, Mandiri, Brankas Toko" value={formData.namaRekening} onChange={e=>setFormData({...formData, namaRekening: e.target.value})} className="w-full px-3 py-2 border rounded-xl" /></div>
+                  <div><label className="block text-sm font-medium mb-1">Nama Rekening/Kas *</label><input required type="text" value={formData.namaRekening} onChange={e=>setFormData({...formData, namaRekening: e.target.value})} className="w-full px-3 py-2 border rounded-xl" /></div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className="block text-sm font-medium mb-1">Nomor Rekening</label><input type="text" placeholder="Opsional" value={formData.nomorRekening || ''} onChange={e=>setFormData({...formData, nomorRekening: e.target.value})} className="w-full px-3 py-2 border rounded-xl" /></div>
-                    <div><label className="block text-sm font-medium mb-1">Atas Nama</label><input type="text" placeholder="Opsional" value={formData.atasNama || ''} onChange={e=>setFormData({...formData, atasNama: e.target.value})} className="w-full px-3 py-2 border rounded-xl" /></div>
+                    <div><label className="block text-sm font-medium mb-1">No. Rekening</label><input type="text" value={formData.nomorRekening || ''} onChange={e=>setFormData({...formData, nomorRekening: e.target.value})} className="w-full px-3 py-2 border rounded-xl" /></div>
+                    <div><label className="block text-sm font-medium mb-1">Atas Nama</label><input type="text" value={formData.atasNama || ''} onChange={e=>setFormData({...formData, atasNama: e.target.value})} className="w-full px-3 py-2 border rounded-xl" /></div>
                   </div>
                   <div><label className="block text-sm font-medium mb-1">Saldo Awal (Rp)</label><input type="number" min="0" value={formData.saldoAwal} onChange={e=>setFormData({...formData, saldoAwal: e.target.value})} className="w-full px-3 py-2 border rounded-xl" /></div>
                 </>
@@ -395,8 +444,11 @@ export default function AdminSettings() {
               )}
 
               <div className="pt-4 border-t mt-6 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 hover:bg-brand-brown/5 rounded-xl font-medium text-brand-brown">Batal</button>
-                <button type="submit" className="px-4 py-2 bg-brand-gold text-white rounded-xl font-medium">Simpan</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 hover:bg-brand-brown/5 rounded-xl font-medium" disabled={submitting}>Batal</button>
+                <button type="submit" className="px-4 py-2 bg-brand-gold text-white rounded-xl font-medium flex items-center gap-2" disabled={submitting}>
+                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {submitting ? 'Menyimpan...' : 'Simpan Data'}
+                </button>
               </div>
             </form>
           </div>
