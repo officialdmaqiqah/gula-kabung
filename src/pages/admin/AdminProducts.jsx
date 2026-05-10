@@ -1,20 +1,57 @@
-import React, { useState } from 'react';
-import { Plus, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
-import { useLocalStorage } from '../../hooks/useLocalStorage';
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit, Trash2, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
 
-// Start with empty products if user wants total control
-const initialProducts = [];
-
 export default function AdminProducts() {
-  const [products, setProducts] = useLocalStorage('kabungmart_products', initialProducts);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [formData, setFormData] = useState({
     namaProduk: '', deskripsi: '', kategori: '', ukuran: '', hargaJual: '', hargaModal: '', stok: 0, satuan: 'pcs', statusAktif: true, imageUrl: ''
   });
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('kabung_products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Map back from snake_case to camelCase
+      const mappedData = data.map(p => ({
+        id: p.id,
+        namaProduk: p.nama_produk,
+        deskripsi: p.deskripsi,
+        kategori: p.kategori,
+        ukuran: p.ukuran,
+        hargaJual: p.harga_jual,
+        hargaModal: p.harga_modal,
+        stok: p.stok,
+        satuan: p.satuan,
+        statusAktif: p.status_aktif,
+        imageUrl: p.image_url
+      }));
+
+      setProducts(mappedData);
+    } catch (error) {
+      console.error('Error fetching products:', error.message);
+      alert('Gagal mengambil data produk: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenModal = (product = null) => {
     if (product) {
@@ -29,23 +66,47 @@ export default function AdminProducts() {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setProducts(prevProducts => {
-      const newProduct = {
-        ...formData,
-        hargaJual: Number(formData.hargaJual),
-        hargaModal: Number(formData.hargaModal),
+    try {
+      setIsSubmitting(true);
+      
+      const payload = {
+        nama_produk: formData.namaProduk,
+        deskripsi: formData.deskripsi,
+        kategori: formData.kategori,
+        ukuran: formData.ukuran,
+        harga_jual: Number(formData.hargaJual),
+        harga_modal: Number(formData.hargaModal),
         stok: Number(formData.stok),
+        satuan: formData.satuan,
+        status_aktif: formData.statusAktif,
+        image_url: formData.imageUrl
       };
 
       if (editingId) {
-        return prevProducts.map(p => p.id === editingId ? { ...newProduct, id: editingId } : p);
+        const { error } = await supabase
+          .from('kabung_products')
+          .update(payload)
+          .eq('id', editingId);
+        
+        if (error) throw error;
       } else {
-        return [...prevProducts, { ...newProduct, id: Date.now() }];
+        const { error } = await supabase
+          .from('kabung_products')
+          .insert([payload]);
+        
+        if (error) throw error;
       }
-    });
-    setIsModalOpen(false);
+
+      await fetchProducts();
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error saving product:', error.message);
+      alert('Gagal menyimpan produk: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleImageUpload = (e) => {
@@ -63,9 +124,20 @@ export default function AdminProducts() {
     }
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Yakin ingin menghapus produk ini?')) {
+  const handleDelete = async (id) => {
+    try {
+      const { error } = await supabase
+        .from('kabung_products')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
       setProducts(prev => prev.filter(p => p.id !== id));
+      setDeletingId(null);
+    } catch (error) {
+      console.error('Error deleting product:', error.message);
+      alert('Gagal menghapus produk: ' + error.message);
     }
   };
 
@@ -74,11 +146,12 @@ export default function AdminProducts() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-brand-brown/5 pb-8">
         <div>
           <h1 className="text-4xl font-black text-brand-brown tracking-tight">Katalog <span className="italic font-light text-brand-brown/40">Produk</span></h1>
-          <p className="text-sm text-brand-brown/40 font-medium mt-1">Kelola daftar produk dan informasi stok Anda.</p>
+          <p className="text-sm text-brand-brown/40 font-medium mt-1">Kelola daftar produk dan informasi stok Anda secara online.</p>
         </div>
         <button 
           onClick={() => handleOpenModal()}
           className="btn-gold px-8 py-4 flex items-center gap-3 text-sm"
+          disabled={loading}
         >
           <Plus className="w-5 h-5" /> Tambah Produk Baru
         </button>
@@ -97,85 +170,93 @@ export default function AdminProducts() {
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-brown/5">
-              {products.map((product) => (
-                <tr key={product.id} className="hover:bg-brand-brown/[0.02] transition-colors group">
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-brand-brown/5 shrink-0 border border-brand-brown/5">
-                        {product.imageUrl ? (
-                          <img src={product.imageUrl} alt={product.namaProduk} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Plus className="w-4 h-4 text-brand-brown/10" />
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <div className="font-bold text-brand-brown group-hover:text-brand-gold transition-colors">{product.namaProduk}</div>
-                        <div className="text-[10px] font-bold text-brand-brown/30 uppercase tracking-widest mt-1">{product.ukuran} — {product.kategori}</div>
-                      </div>
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="px-8 py-20 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="w-10 h-10 text-brand-gold animate-spin" />
+                      <p className="text-sm font-bold text-brand-brown/40 uppercase tracking-widest">Memuat Data...</p>
                     </div>
                   </td>
-                  <td className="px-8 py-6 text-brand-brown font-black">{formatRupiah(product.hargaJual)}</td>
-                  <td className="px-8 py-6">
-                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                      product.stok > 5 
-                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                        : product.stok > 0 
-                        ? 'bg-amber-50 text-amber-600 border-amber-100' 
-                        : 'bg-rose-50 text-rose-600 border-rose-100'
-                    }`}>
-                      {product.stok} {product.satuan}
-                    </span>
-                  </td>
-                  <td className="px-8 py-6">
-                    {product.statusAktif ? (
-                      <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600">
-                        <CheckCircle className="w-4 h-4" /> Aktif
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-rose-400">
-                        <XCircle className="w-4 h-4" /> Nonaktif
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-8 py-6 text-right">
-                    {deletingId === product.id ? (
-                      <div className="flex justify-end items-center gap-2 animate-fade-in">
-                        <span className="text-[9px] font-black uppercase text-rose-500 mr-2">Hapus?</span>
-                        <button 
-                          onClick={() => {
-                            setProducts(prev => prev.filter(p => p.id !== product.id));
-                            setDeletingId(null);
-                          }} 
-                          className="px-4 py-2 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all"
-                        >
-                          Ya
-                        </button>
-                        <button 
-                          onClick={() => setDeletingId(null)} 
-                          className="px-4 py-2 bg-brand-brown/5 text-brand-brown rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-brown/10 transition-all"
-                        >
-                          Tidak
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex justify-end gap-3 transition-opacity">
-                        <button onClick={() => handleOpenModal(product)} className="p-3 text-brand-brown hover:bg-brand-brown hover:text-white rounded-xl transition-all bg-brand-brown/5">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setDeletingId(product.id)} className="p-4 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all bg-rose-50" title="Hapus Produk">
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    )}
-                  </td>
                 </tr>
-              ))}
-              {products.length === 0 && (
+              ) : (
+                products.map((product) => (
+                  <tr key={product.id} className="hover:bg-brand-brown/[0.02] transition-colors group">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl overflow-hidden bg-brand-brown/5 shrink-0 border border-brand-brown/5">
+                          {product.imageUrl ? (
+                            <img src={product.imageUrl} alt={product.namaProduk} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Plus className="w-4 h-4 text-brand-brown/10" />
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-bold text-brand-brown group-hover:text-brand-gold transition-colors">{product.namaProduk}</div>
+                          <div className="text-[10px] font-bold text-brand-brown/30 uppercase tracking-widest mt-1">{product.ukuran} — {product.kategori}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 text-brand-brown font-black">{formatRupiah(product.hargaJual)}</td>
+                    <td className="px-8 py-6">
+                      <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                        product.stok > 5 
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                          : product.stok > 0 
+                          ? 'bg-amber-50 text-amber-600 border-amber-100' 
+                          : 'bg-rose-50 text-rose-600 border-rose-100'
+                      }`}>
+                        {product.stok} {product.satuan}
+                      </span>
+                    </td>
+                    <td className="px-8 py-6">
+                      {product.statusAktif ? (
+                        <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600">
+                          <CheckCircle className="w-4 h-4" /> Aktif
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-rose-400">
+                          <XCircle className="w-4 h-4" /> Nonaktif
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      {deletingId === product.id ? (
+                        <div className="flex justify-end items-center gap-2 animate-fade-in">
+                          <span className="text-[9px] font-black uppercase text-rose-500 mr-2">Hapus?</span>
+                          <button 
+                            onClick={() => handleDelete(product.id)} 
+                            className="px-4 py-2 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all"
+                          >
+                            Ya
+                          </button>
+                          <button 
+                            onClick={() => setDeletingId(null)} 
+                            className="px-4 py-2 bg-brand-brown/5 text-brand-brown rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-brown/10 transition-all"
+                          >
+                            Tidak
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end gap-3 transition-opacity">
+                          <button onClick={() => handleOpenModal(product)} className="p-3 text-brand-brown hover:bg-brand-brown hover:text-white rounded-xl transition-all bg-brand-brown/5">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => setDeletingId(product.id)} className="p-4 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all bg-rose-50" title="Hapus Produk">
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+              {!loading && products.length === 0 && (
                 <tr>
                   <td colSpan="5" className="px-6 py-8 text-center text-brand-brown/40">
-                    Belum ada data produk.
+                    Belum ada data produk di database online.
                   </td>
                 </tr>
               )}
@@ -247,8 +328,11 @@ export default function AdminProducts() {
                 </div>
               </div>
               <div className="pt-4 border-t border-brand-brown/10 flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-brand-brown/60 font-medium hover:bg-brand-brown/5 rounded-xl">Batal</button>
-                <button type="submit" className="px-4 py-2 bg-brand-gold text-white font-medium rounded-xl">Simpan Produk</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-brand-brown/60 font-medium hover:bg-brand-brown/5 rounded-xl" disabled={isSubmitting}>Batal</button>
+                <button type="submit" className="px-4 py-2 bg-brand-gold text-white font-medium rounded-xl flex items-center gap-2" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {editingId ? 'Simpan Perubahan' : 'Simpan Produk'}
+                </button>
               </div>
             </form>
           </div>

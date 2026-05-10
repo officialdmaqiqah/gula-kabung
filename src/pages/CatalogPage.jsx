@@ -1,34 +1,57 @@
-import React, { useState } from 'react';
-import { Leaf, Search, Filter, ShoppingBag, ArrowRight, Grid, List } from 'lucide-react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import React, { useState, useEffect } from 'react';
+import { Leaf, Search, Filter, ShoppingBag, ArrowRight, Grid, List, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { formatRupiah } from '../utils/format';
 import { useCart } from '../context/CartContext';
 
 export default function CatalogPage() {
-  const [adminProducts] = useLocalStorage('kabungmart_products', []);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Semua');
   
   const [selectedProduct, setSelectedProduct] = useState(null);
   
-  // Only show products from Admin
-  const displayProducts = adminProducts.filter(p => p.statusAktif).map(p => ({
-    id: p.id,
-    name: p.namaProduk,
-    price: p.hargaJual,
-    formattedPrice: formatRupiah(p.hargaJual),
-    label: p.stok <= 0 ? 'Habis' : (p.stok <= 5 ? 'Stok Menipis' : ''),
-    category: p.kategori || 'Lainnya',
-    image: p.imageUrl,
-    description: p.deskripsi,
-    stok: p.stok,
-    ukuran: p.ukuran || ''
-  }));
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
-  const categories = ['Semua', ...new Set(displayProducts.map(p => p.category))];
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('kabung_products')
+        .select('*')
+        .eq('status_aktif', true)
+        .order('created_at', { ascending: false });
 
-  const filteredProducts = displayProducts.filter(p => {
+      if (error) throw error;
+
+      const mappedData = data.map(p => ({
+        id: p.id,
+        name: p.nama_produk,
+        price: p.harga_jual,
+        formattedPrice: formatRupiah(p.harga_jual),
+        label: p.stok <= 0 ? 'Habis' : (p.stok <= 5 ? 'Stok Menipis' : ''),
+        category: p.kategori || 'Lainnya',
+        image: p.image_url,
+        description: p.deskripsi,
+        stok: p.stok,
+        ukuran: p.ukuran || ''
+      }));
+
+      setProducts(mappedData);
+    } catch (error) {
+      console.error('Error fetching catalog:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const categories = ['Semua', ...new Set(products.map(p => p.category))];
+
+  const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategory === 'Semua' || p.category === activeCategory;
     return matchesSearch && matchesCategory;
@@ -84,7 +107,12 @@ export default function CatalogPage() {
         </div>
 
         {/* Product Grid */}
-        {filteredProducts.length > 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-32 animate-fade-in">
+            <Loader2 className="w-16 h-16 text-brand-gold animate-spin mb-6" />
+            <p className="text-sm font-black uppercase tracking-[0.3em] text-brand-brown/40">Menyiapkan Koleksi...</p>
+          </div>
+        ) : filteredProducts.length > 0 ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
             {filteredProducts.map((product, i) => (
               <div 
