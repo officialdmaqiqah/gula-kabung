@@ -35,6 +35,8 @@ export default function AdminLayout() {
   const navItems = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Produk & Stok', path: '/admin/products', icon: Package },
+    { name: 'Pembelian Stok', path: '/admin/purchases', icon: Receipt },
+    { name: 'Penerimaan Barang', path: '/admin/receiving', icon: Truck },
     { name: 'Penjualan', path: '/admin/sales', icon: ShoppingCart },
     { name: 'Pencatatan Keuangan', path: '/admin/finances', icon: Wallet },
     { name: 'Laporan Laba Rugi', path: '/admin/reports', icon: BarChart3 },
@@ -81,7 +83,7 @@ export default function AdminLayout() {
       </nav>
 
       {/* Sidebar Footer */}
-      <div className="p-6 border-t border-white/5 space-y-2">
+      <div className="p-6 border-t border-white/5">
         <Link 
           to="/"
           className="flex items-center gap-4 px-8 py-4 text-white/40 hover:bg-white/5 hover:text-white rounded-2xl transition-all text-[10px] font-black uppercase tracking-[0.2em]"
@@ -89,13 +91,6 @@ export default function AdminLayout() {
           <Home className="w-4 h-4" />
           <span>Ke Toko</span>
         </Link>
-        <button 
-          onClick={logout}
-          className="w-full flex items-center gap-4 px-8 py-4 text-rose-400 hover:bg-rose-400/5 rounded-2xl transition-all text-[10px] font-black uppercase tracking-[0.2em]"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>Sign Out</span>
-        </button>
       </div>
     </div>
   );
@@ -138,29 +133,19 @@ export default function AdminLayout() {
             </h2>
           </div>
           
-          <div className="flex items-center gap-3">
-            {/* Logistic Quick Access Icons */}
-            <div className="flex items-center gap-2 bg-brand-brown/5 p-1.5 rounded-2xl">
-              <Link 
-                to="/admin/purchases" 
-                title="Pembelian Stok"
-                className={`p-2.5 rounded-xl transition-all ${location.pathname === '/admin/purchases' ? 'bg-brand-brown text-white shadow-lg' : 'text-brand-brown hover:bg-brand-brown/10'}`}
-              >
-                <Receipt className="w-5 h-5" />
-              </Link>
-              <Link 
-                to="/admin/receiving" 
-                title="Penerimaan Barang"
-                className={`p-2.5 rounded-xl transition-all ${location.pathname === '/admin/receiving' ? 'bg-brand-brown text-white shadow-lg' : 'text-brand-brown hover:bg-brand-brown/10'}`}
-              >
-                <Truck className="w-5 h-5" />
-              </Link>
-            </div>
-
+          <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 px-4 py-2 bg-emerald-500/10 text-emerald-600 rounded-2xl border border-emerald-500/20">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-[10px] font-black uppercase tracking-widest">Active</span>
             </div>
+
+            <button 
+              onClick={logout}
+              title="Log Out"
+              className="p-3 bg-rose-500/10 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-lg shadow-rose-500/10"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
         </header>
 
