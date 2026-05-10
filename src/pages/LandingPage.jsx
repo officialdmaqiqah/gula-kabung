@@ -240,9 +240,15 @@ export default function LandingPage() {
             <div className="md:col-span-3">
               <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-brand-gold mb-10">Kontak Kami</h4>
               <ul className="space-y-6 text-xs font-black uppercase tracking-[0.2em] text-white/50">
-                <li className="flex items-start gap-4">
-                  <span className="text-brand-gold">Lokasi:</span>
-                  <span>Gunung Riting, Membalong, Belitung Selatan</span>
+                <li className="flex flex-col gap-4">
+                  <div className="flex items-start gap-4">
+                    <span className="text-brand-gold min-w-[100px]">Produksi:</span>
+                    <span className="text-white/50">Gunung Riting, Membalong, Belitung</span>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <span className="text-brand-gold min-w-[100px]">Pemasaran:</span>
+                    <span className="text-white/50">Pangkalpinang, Bangka Belitung</span>
+                  </div>
                 </li>
                 <li className="flex items-center gap-4">
                   <span className="text-brand-gold">Social:</span>
@@ -256,7 +262,7 @@ export default function LandingPage() {
           </div>
           
           <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-8 text-[10px] font-black uppercase tracking-[0.3em] text-white/20">
-            <p>&copy; {new Date().getFullYear()} Gula Kabung Belitung. Terdaftar sebagai Merek Premium.</p>
+            <p>&copy; {new Date().getFullYear()} Gula Kabung Belitung.</p>
             <div className="flex gap-10">
               <a href="#" className="hover:text-white transition-colors">Privacy</a>
               <a href="#" className="hover:text-white transition-colors">Terms</a>
