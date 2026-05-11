@@ -47,7 +47,7 @@ export default function AdminLayout() {
   const SidebarContent = () => (
     <div className="h-full flex flex-col bg-brand-brown lg:rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/5">
       {/* Sidebar Header */}
-      <div className="p-8 border-b border-white/5">
+      <div className="p-6 border-b border-white/5">
         <Link to="/" className="flex items-center gap-4 group">
           <div className="w-12 h-12 bg-brand-gold rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:rotate-12 shadow-xl shadow-brand-gold/20">
             <Store className="w-6 h-6 text-brand-brown" />
@@ -68,7 +68,7 @@ export default function AdminLayout() {
             <Link
               key={item.path}
               to={item.path}
-              className={`group flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-500 ${
+              className={`group flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-500 ${
                 isActive 
                   ? 'bg-brand-gold text-white shadow-2xl scale-[1.02]' 
                   : 'text-white/60 hover:bg-white/5 hover:text-white'
@@ -108,7 +108,7 @@ export default function AdminLayout() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Simple Top Bar */}
-        <header className="h-20 flex items-center justify-between px-6 lg:px-10 bg-white/60 backdrop-blur-xl border-b border-brand-brown/5">
+        <header className="h-16 flex items-center justify-between px-6 lg:px-10 bg-white/60 backdrop-blur-xl border-b border-brand-brown/5">
           <div className="flex items-center gap-4">
             <button 
               onClick={toggleSidebar}
@@ -138,7 +138,7 @@ export default function AdminLayout() {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto px-6 lg:px-10 py-6 lg:py-10 bg-brand-cream/30">
+        <main className="flex-1 overflow-y-auto px-6 lg:px-10 py-4 lg:py-6 bg-brand-cream/30">
           <div className="max-w-6xl mx-auto w-full">
             <Outlet />
           </div>

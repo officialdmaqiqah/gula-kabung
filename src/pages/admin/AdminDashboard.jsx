@@ -107,9 +107,9 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="space-y-10 pb-12">
+    <div className="space-y-6 pb-4">
       {/* Quick Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {[
           { label: 'Pemasukan Hari Ini', value: formatRupiah(salesToday), icon: DollarSign, color: 'emerald', trend: '+Live' },
           { label: 'Pemasukan Bulan Ini', value: formatRupiah(salesThisMonth), icon: TrendingUp, color: 'brand-gold', trend: 'Realtime' },
@@ -125,9 +125,9 @@ export default function AdminDashboard() {
           const colorClass = colorMap[stat.color] || colorMap.emerald;
           
           return (
-            <div key={i} className="bg-white rounded-3xl p-8 shadow-sm border border-black/5 group hover:border-brand-gold/30 transition-all">
-              <div className="flex justify-between items-start mb-6">
-                <div className={`p-4 rounded-2xl group-hover:scale-110 transition-all duration-500 shadow-sm ${colorClass.split(' ').filter(c => !c.startsWith('border')).join(' ')}`}>
+            <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-black/5 group hover:border-brand-gold/30 transition-all">
+              <div className="flex justify-between items-start mb-4">
+                <div className={`p-3 rounded-2xl group-hover:scale-110 transition-all duration-500 shadow-sm ${colorClass.split(' ').filter(c => !c.startsWith('border')).join(' ')}`}>
                   <stat.icon className="w-6 h-6" />
                 </div>
                 <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${colorClass.split(' ').filter(c => !c.startsWith('shadow')).join(' ')}`}>
@@ -144,20 +144,20 @@ export default function AdminDashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 items-start">
         {/* Laba Rugi Card */}
-        <div className="lg:col-span-8 relative overflow-hidden rounded-[2.5rem] bg-brand-brown text-white shadow-2xl min-h-[400px] flex flex-col border border-brand-gold/10">
+        <div className="lg:col-span-8 relative overflow-hidden rounded-[2.5rem] bg-brand-brown text-white shadow-2xl min-h-[320px] flex flex-col border border-brand-gold/10">
           <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-brand-gold/10 via-transparent to-transparent pointer-events-none" />
           
-          <div className="relative z-10 p-12 flex flex-col h-full">
-            <div className="flex items-center justify-between mb-16">
-              <div className="flex items-center gap-5">
-                <div className="p-4 bg-brand-gold/10 rounded-2xl border border-brand-gold/20">
-                  <TrendingUp className="w-8 h-8 text-brand-gold" />
+          <div className="relative z-10 p-8 flex flex-col h-full">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-brand-gold/10 rounded-xl border border-brand-gold/20">
+                  <TrendingUp className="w-6 h-6 text-brand-gold" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black tracking-tight text-white">Ikhtisar Keuangan</h2>
-                  <p className="text-sm text-brand-gold font-bold italic tracking-wider">Performa Bulan Ini</p>
+                  <h2 className="text-xl font-black tracking-tight text-white">Ikhtisar Keuangan</h2>
+                  <p className="text-xs text-brand-gold font-bold italic tracking-wider">Performa Bulan Ini</p>
                 </div>
               </div>
               <div className="px-5 py-2.5 bg-brand-gold/10 rounded-xl border border-brand-gold/20 text-[10px] font-black tracking-[0.3em] uppercase text-brand-gold">
@@ -166,34 +166,34 @@ export default function AdminDashboard() {
             </div>
             
             <div className="flex-grow flex flex-col justify-center">
-              <p className="text-[10px] font-black text-brand-gold uppercase tracking-[0.5em] mb-6">Total Net Profit</p>
-              <h3 className="text-6xl md:text-8xl font-black tracking-tighter text-white">
+              <p className="text-[10px] font-black text-brand-gold uppercase tracking-[0.5em] mb-3">Total Net Profit</p>
+              <h3 className="text-5xl md:text-6xl font-black tracking-tighter text-white">
                 {formatRupiah(profitLoss)}
               </h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-12 mt-16 pt-12 border-t border-white/5">
+            <div className="grid grid-cols-2 gap-8 mt-8 pt-8 border-t border-white/5">
               <div className="group">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-2 h-2 rounded-full bg-emerald-500" />
                   <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">Gross Income</p>
                 </div>
-                <p className="text-3xl font-black text-white">{formatRupiah(salesThisMonth)}</p>
+                <p className="text-2xl font-black text-white">{formatRupiah(salesThisMonth)}</p>
               </div>
               <div className="group">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-2 h-2 rounded-full bg-rose-500" />
                   <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">Total Expenses</p>
                 </div>
-                <p className="text-3xl font-black text-white">{formatRupiah(expensesThisMonth)}</p>
+                <p className="text-2xl font-black text-white">{formatRupiah(expensesThisMonth)}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Low Stock Warning */}
-        <div className="lg:col-span-4 bg-white/70 rounded-3xl p-8 flex flex-col shadow-xl border border-brand-brown/5 backdrop-blur-md">
-          <div className="flex items-center justify-between mb-8">
+        <div className="lg:col-span-4 bg-white/70 rounded-3xl p-6 flex flex-col shadow-xl border border-brand-brown/5 backdrop-blur-md">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-xl font-black text-brand-brown tracking-tight flex items-center gap-3">
                 <AlertTriangle className="w-6 h-6 text-brand-gold" />
@@ -206,7 +206,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="flex-grow space-y-4 overflow-y-auto max-h-[450px] pr-2 no-scrollbar">
+          <div className="flex-grow space-y-3 overflow-y-auto max-h-[220px] pr-2 no-scrollbar">
             {lowStockProducts.length > 0 ? (
               lowStockProducts.map(p => (
                 <div key={p.id} className="group p-5 bg-white border border-brand-brown/5 rounded-2xl hover:border-brand-gold/30 hover:shadow-lg transition-all duration-500">
@@ -244,7 +244,7 @@ export default function AdminDashboard() {
           
           <button 
             onClick={() => navigate('/admin/products')}
-            className="mt-8 w-full py-4 bg-brand-brown text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-brand-gold transition-all shadow-lg shadow-brand-brown/10"
+            className="mt-6 w-full py-3 bg-brand-brown text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-brand-gold transition-all shadow-lg shadow-brand-brown/10"
           >
             Manajemen Produk
           </button>
