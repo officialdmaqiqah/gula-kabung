@@ -75,7 +75,7 @@ export default function CatalogPage() {
           <div className="inline-flex items-center gap-3 py-2 px-5 rounded-full bg-brand-brown/5 border border-brand-brown/10 text-brand-brown text-[10px] font-black tracking-[0.3em] uppercase mb-8">
             <Leaf className="w-4 h-4 text-brand-gold" /> Koleksi Pilihan
           </div>
-          <h1 className="text-5xl md:text-7xl font-heading font-black text-brand-brown mb-8 tracking-tighter leading-none">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-heading font-black text-brand-brown mb-8 tracking-tighter leading-none">
             Katalog <span className="text-brand-gold italic font-light">Eksklusif.</span>
           </h1>
           <p className="text-brand-brown/60 max-w-2xl text-lg font-medium leading-relaxed mx-auto md:mx-0">

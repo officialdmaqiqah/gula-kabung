@@ -25,7 +25,7 @@ export default function CheckoutPage() {
               <div className="flex items-center gap-3 text-brand-gold font-black text-[10px] uppercase tracking-[0.4em] mb-2">
                 <Leaf className="w-4 h-4" /> Finalisasi Pesanan
               </div>
-              <h1 className="text-4xl md:text-5xl font-heading font-black text-brand-brown tracking-tighter">Checkout.</h1>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-black text-brand-brown tracking-tighter">Checkout.</h1>
             </div>
           </div>
           

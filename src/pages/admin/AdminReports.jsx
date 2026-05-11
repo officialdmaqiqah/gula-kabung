@@ -265,9 +265,9 @@ export default function AdminReports() {
 
       {/* CONTENT: LABA RUGI */}
       {activeTab === 'labarugi' && (
-        <div className="grid lg:grid-cols-12 gap-8 animate-fade-up">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-up">
           <div className="lg:col-span-8 space-y-6">
-            <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-brand-brown/5">
+            <div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-sm border border-brand-brown/5">
               <h3 className="text-xl font-black text-brand-brown mb-8 flex items-center gap-3">
                 <PieChart className="w-6 h-6 text-brand-gold" /> Rincian Laba Rugi
               </h3>
@@ -296,7 +296,7 @@ export default function AdminReports() {
                   <span className="text-lg font-black text-emerald-600">{formatRupiah(pnl.otherIncome)}</span>
                 </div>
 
-                <div className={`flex justify-between items-center p-8 rounded-3xl ${pnl.netProfit >= 0 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'} shadow-2xl`}>
+                <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 md:p-8 rounded-3xl ${pnl.netProfit >= 0 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'} shadow-2xl gap-4`}>
                   <div>
                     <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Laba Bersih (Net Profit)</span>
                     <h4 className="text-3xl font-black tracking-tighter mt-1">{formatRupiah(pnl.netProfit)}</h4>
@@ -323,7 +323,7 @@ export default function AdminReports() {
       {/* CONTENT: NERACA */}
       {activeTab === 'neraca' && (
         <div className="grid lg:grid-cols-2 gap-8 animate-fade-up">
-          <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-brand-brown/5">
+          <div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-sm border border-brand-brown/5">
             <div className="flex items-center justify-between mb-10">
               <h3 className="text-xl font-black text-brand-brown flex items-center gap-3">
                 <Wallet className="w-6 h-6 text-brand-gold" /> Aktiva (Assets)
@@ -346,7 +346,7 @@ export default function AdminReports() {
             </div>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-brand-brown/5">
+          <div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-sm border border-brand-brown/5">
             <div className="flex items-center justify-between mb-10">
               <h3 className="text-xl font-black text-brand-brown flex items-center gap-3">
                 <Briefcase className="w-6 h-6 text-brand-gold" /> Pasiva (Equity)
@@ -378,7 +378,7 @@ export default function AdminReports() {
 
       {/* CONTENT: ARUS KAS */}
       {activeTab === 'aruskas' && (
-        <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-brand-brown/5 animate-fade-up">
+        <div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-sm border border-brand-brown/5 animate-fade-up">
           <div className="flex items-center justify-between mb-12">
             <h3 className="text-xl font-black text-brand-brown flex items-center gap-3">
               <Wallet className="w-6 h-6 text-brand-gold" /> Laporan Arus Kas
@@ -418,9 +418,9 @@ export default function AdminReports() {
 
       {/* CONTENT: TUTUP BUKU */}
       {activeTab === 'tutupbuku' && (
-        <div className="grid lg:grid-cols-12 gap-8 animate-fade-up">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-up">
           <div className="lg:col-span-8 space-y-6">
-            <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-brand-brown/5">
+            <div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-sm border border-brand-brown/5">
               <div className="flex justify-between items-center mb-10">
                 <h3 className="text-xl font-black text-brand-brown flex items-center gap-3">
                   <Lock className="w-6 h-6 text-brand-gold" /> Proses Tutup Buku

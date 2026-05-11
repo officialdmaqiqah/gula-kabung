@@ -70,7 +70,7 @@ export default function LandingPage() {
               <Star className="w-3 h-3 text-brand-gold fill-brand-gold" /> Terpercaya Puluhan Tahun
             </div>
             
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-heading font-black text-brand-brown mb-8 leading-[1] tracking-tight animate-slide-up">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-heading font-black text-brand-brown mb-8 leading-[1] tracking-tight animate-slide-up">
               Manisnya <br className="hidden md:block"/>
               <span className="text-brand-gold italic font-light">Warisan</span> Alam.
             </h1>
