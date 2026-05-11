@@ -225,7 +225,7 @@ export default function AdminPurchases() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-brand-brown/10 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left min-w-[900px]">
             <thead className="bg-brand-brown/5 border-b border-brand-brown/10">
               <tr>
                 <th className="px-6 py-4 text-xs font-black uppercase tracking-widest text-brand-brown">Tanggal</th>
@@ -295,8 +295,9 @@ export default function AdminPurchases() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-auto p-4 md:p-8">
+          <div className="flex min-h-full items-center justify-center">
+            <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl overflow-hidden animate-fade-up">
             <div className="p-8 border-b border-brand-brown/5 flex justify-between items-center sticky top-0 bg-white/80 backdrop-blur-md z-10">
               <h2 className="text-xl font-bold text-brand-brown flex items-center gap-3">
                 <Receipt className="w-6 h-6 text-brand-gold" />
@@ -392,7 +393,8 @@ export default function AdminPurchases() {
             </form>
           </div>
         </div>
-      )}
+      </div>
+    )}
     </div>
   );
 }

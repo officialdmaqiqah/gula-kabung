@@ -214,7 +214,8 @@ export default function AdminReceiving() {
         </div>
 
         <div className="bg-white rounded-3xl border border-brand-brown/10 overflow-hidden shadow-sm">
-          <table className="w-full text-left">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[800px]">
             <thead className="bg-brand-brown/5 border-b border-brand-brown/10">
               <tr>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-brand-brown">Tgl Terima</th>
@@ -245,14 +246,16 @@ export default function AdminReceiving() {
                 </tr>
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       </section>
 
       {/* MODAL: INPUT RECEIVING */}
       {isModalOpen && selectedOrder && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-fade-up">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 overflow-y-auto p-4 md:p-8">
+          <div className="flex min-h-full items-center justify-center">
+            <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden animate-fade-up relative">
             <div className="p-10 bg-brand-brown text-white relative">
               <div className="absolute top-0 right-0 p-10 opacity-10">
                 <Package className="w-32 h-32" />
@@ -307,6 +310,7 @@ export default function AdminReceiving() {
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

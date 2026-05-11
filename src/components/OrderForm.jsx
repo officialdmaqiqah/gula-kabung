@@ -144,7 +144,7 @@ export default function OrderForm() {
   };
 
   const inputClass = (name) => `
-    w-full px-6 py-5 rounded-2xl border transition-all duration-300 font-bold text-brand-brown bg-white
+    w-full px-4 md:px-6 py-4 md:py-5 rounded-2xl border transition-all duration-300 font-bold text-brand-brown bg-white
     ${errors[name] ? 'border-rose-300 focus:border-rose-500 focus:ring-4 focus:ring-rose-100' : 'border-brand-brown/10 focus:border-brand-gold focus:ring-4 focus:ring-brand-gold/10'}
     outline-none placeholder:text-brand-brown/30 appearance-none
   `;
@@ -163,7 +163,7 @@ export default function OrderForm() {
   }
 
   return (
-    <div className="p-10 lg:p-16">
+    <div className="p-6 md:p-10 lg:p-16">
       <div className="flex items-center gap-4 mb-12">
         <div className="w-2 h-10 bg-brand-gold rounded-full"></div>
         <div>
@@ -218,7 +218,7 @@ export default function OrderForm() {
 
         <div className="relative group">
           <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-brand-brown/60 mb-3"><MessageSquare className="w-3.5 h-3.5" /> Catatan Pesanan</label>
-          <textarea name="notes" value={formData.notes} onChange={handleChange} rows="2" className="w-full px-6 py-5 rounded-2xl border border-brand-brown/10 focus:border-brand-gold outline-none font-bold text-brand-brown bg-white placeholder:text-brand-brown/30" placeholder="Contoh: Packing tambahan, dll..."></textarea>
+          <textarea name="notes" value={formData.notes} onChange={handleChange} rows="2" className="w-full px-4 md:px-6 py-4 md:py-5 rounded-2xl border border-brand-brown/10 focus:border-brand-gold outline-none font-bold text-brand-brown bg-white placeholder:text-brand-brown/30" placeholder="Contoh: Packing tambahan, dll..."></textarea>
         </div>
 
         <div className="pt-6">

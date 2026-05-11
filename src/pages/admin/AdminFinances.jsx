@@ -345,7 +345,7 @@ export default function AdminFinances() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-brand-brown/10 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left min-w-[800px]">
             <thead className="bg-brand-brown/5 border-b border-brand-brown/10">
               <tr>
                 <th className="px-6 py-4 text-sm font-semibold text-brand-brown">Tanggal</th>
@@ -414,8 +414,9 @@ export default function AdminFinances() {
 
       {/* MODAL PENGELUARAN */}
       {isExpenseModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 overflow-y-auto p-4">
+          <div className="flex min-h-full items-center justify-center">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fade-up">
             <div className="p-6 border-b border-brown-100 flex justify-between items-center">
               <h2 className="text-xl font-bold text-brown-900">{editingId ? 'Edit Pengeluaran' : 'Tambah Pengeluaran'}</h2>
             </div>
@@ -445,12 +446,14 @@ export default function AdminFinances() {
             </form>
           </div>
         </div>
-      )}
+      </div>
+    )}
 
       {/* MODAL PEMASUKAN */}
       {isIncomeModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 overflow-y-auto p-4">
+          <div className="flex min-h-full items-center justify-center">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fade-up">
             <div className="p-6 border-b border-brown-100 flex justify-between items-center">
               <h2 className="text-xl font-bold text-brown-900">{editingId ? 'Edit Pemasukan' : 'Tambah Pemasukan'}</h2>
             </div>
@@ -480,7 +483,8 @@ export default function AdminFinances() {
             </form>
           </div>
         </div>
-      )}
+      </div>
+    )}
 
     </div>
   );

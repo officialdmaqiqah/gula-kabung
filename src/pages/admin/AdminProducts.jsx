@@ -163,7 +163,7 @@ export default function AdminProducts() {
 
       <div className="bg-white rounded-[2rem] shadow-2xl border border-brand-brown/5 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left min-w-[900px]">
             <thead>
               <tr className="bg-brand-brown text-white">
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em]">Produk</th>
@@ -271,8 +271,9 @@ export default function AdminProducts() {
 
       {/* Modal Form */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 overflow-y-auto p-4">
+          <div className="flex min-h-full items-center justify-center">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-fade-up">
             <div className="p-6 border-b border-brand-brown/10 flex justify-between items-center sticky top-0 bg-white">
               <h2 className="text-xl font-bold text-brand-brown">{editingId ? 'Edit Produk' : 'Tambah Produk Baru'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-brand-brown/40 hover:text-brand-brown"><XCircle className="w-6 h-6" /></button>
@@ -341,7 +342,8 @@ export default function AdminProducts() {
             </form>
           </div>
         </div>
-      )}
+      </div>
+    )}
     </div>
   );
 }

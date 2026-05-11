@@ -202,16 +202,15 @@ export default function CatalogPage() {
 
         {/* Product Detail Modal */}
         {selectedProduct && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 md:p-12">
-            <div className="absolute inset-0 bg-brand-brown/80 backdrop-blur-xl" onClick={() => setSelectedProduct(null)} />
-            
-            <div className="relative bg-white w-full max-w-5xl max-h-[90vh] rounded-[3rem] overflow-hidden shadow-3xl flex flex-col md:flex-row animate-slide-up">
-              <button 
-                onClick={() => setSelectedProduct(null)}
-                className="absolute top-8 right-8 w-12 h-12 bg-white/10 hover:bg-white text-white hover:text-brand-brown rounded-2xl z-20 flex items-center justify-center transition-all border border-white/20"
-              >
-                <Filter className="w-5 h-5 rotate-45" /> {/* Close icon using Filter rotate */}
-              </button>
+          <div className="fixed inset-0 z-[100] overflow-y-auto bg-brand-brown/80 backdrop-blur-xl p-4 md:p-12">
+            <div className="flex min-h-full items-center justify-center">
+              <div className="relative bg-white w-full max-w-5xl rounded-[3rem] overflow-hidden shadow-3xl flex flex-col md:flex-row animate-slide-up">
+                <button 
+                  onClick={() => setSelectedProduct(null)}
+                  className="absolute top-6 right-6 md:top-8 md:right-8 w-12 h-12 bg-white/10 md:bg-white/10 hover:bg-brand-brown hover:text-white text-brand-brown md:text-white rounded-2xl z-20 flex items-center justify-center transition-all border border-brand-brown/10 md:border-white/20 shadow-xl md:shadow-none"
+                >
+                  <span className="text-2xl font-light">×</span>
+                </button>
 
               {/* Modal Image */}
               <div className="w-full md:w-1/2 aspect-square md:aspect-auto bg-brand-brown/5 overflow-hidden">
@@ -272,7 +271,8 @@ export default function CatalogPage() {
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
       </div>
       
