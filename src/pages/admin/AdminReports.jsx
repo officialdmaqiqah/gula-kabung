@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
-import { FileText, Calendar, Download, Loader2, PieChart, TrendingUp, Wallet, ShieldCheck, Briefcase } from 'lucide-react';
+import { FileText, Calendar, Download, Loader2, PieChart, TrendingUp, Wallet, ShieldCheck, Briefcase, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 export default function AdminReports() {
   const [activeTab, setActiveTab] = useState('labarugi');
@@ -13,10 +14,14 @@ export default function AdminReports() {
   const [accounts, setAccounts] = useState([]);
   const [investors, setInvestors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
   
   const [filterPeriod, setFilterPeriod] = useState('Bulan ini');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+
+  // Tutup Buku States
+  const [selectedClosingMonth, setSelectedClosingMonth] = useState(new Date().toISOString().substring(0, 7));
 
   useEffect(() => {
     fetchInitialData();
@@ -90,35 +95,77 @@ export default function AdminReports() {
   // LABA RUGI CALCULATIONS
   const pnl = useMemo(() => {
     const revenue = filteredSales.reduce((sum, s) => sum + Number(s.total_penjualan), 0);
-    
-    // Calculate COGS (HPP)
-    // For every sale, find the product's modal price
     const cogs = filteredSales.reduce((sum, s) => {
       const product = products.find(p => p.id === s.produk_id);
       const costPerItem = product ? Number(product.harga_modal) : 0;
       return sum + (costPerItem * Number(s.jumlah));
     }, 0);
-
     const grossProfit = revenue - cogs;
     const opex = filteredExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0) + 
                  filteredPurchases.reduce((sum, p) => sum + Number(p.harga_beli_total), 0);
-    
     const otherIncome = filteredIncomes.reduce((sum, i) => {
-      // Exclude initial capital from P&L (Financing activity)
       if (i.kategori === 'Modal Awal') return sum;
       return sum + Number(i.jumlah);
     }, 0);
-
     const netProfit = grossProfit - opex + otherIncome;
-
     return { revenue, cogs, grossProfit, opex, otherIncome, netProfit };
   }, [filteredSales, filteredExpenses, filteredPurchases, filteredIncomes, products]);
 
-  // NERACA CALCULATIONS (Current Snapshot)
+  // TUTUP BUKU CALCULATIONS (Specific to selected month)
+  const closingData = useMemo(() => {
+    const monthSales = sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.tanggal.startsWith(selectedClosingMonth));
+    const monthExpenses = expenses.filter(e => e.tanggal.startsWith(selectedClosingMonth));
+    const monthPurchases = purchases.filter(p => p.tanggal.startsWith(selectedClosingMonth));
+    const monthIncomes = incomes.filter(i => i.tanggal.startsWith(selectedClosingMonth) && i.kategori !== 'Modal Awal');
+
+    const revenue = monthSales.reduce((sum, s) => sum + Number(s.total_penjualan), 0);
+    const cogs = monthSales.reduce((sum, s) => {
+      const product = products.find(p => p.id === s.produk_id);
+      return sum + ((product ? Number(product.harga_modal) : 0) * Number(s.jumlah));
+    }, 0);
+    const opex = monthExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0) + 
+                 monthPurchases.reduce((sum, p) => sum + Number(p.harga_beli_total), 0);
+    const otherInc = monthIncomes.reduce((sum, i) => sum + Number(i.jumlah), 0);
+    
+    const netProfit = (revenue - cogs - opex + otherInc);
+
+    // Check if already closed (Search for "Bagi Hasil" expenses for this month)
+    const isAlreadyClosed = monthExpenses.some(e => e.kategori === 'Bagi Hasil Investor');
+
+    return { netProfit, isAlreadyClosed };
+  }, [selectedClosingMonth, sales, expenses, purchases, incomes, products]);
+
+  const handleTutupBuku = async () => {
+    if (closingData.isAlreadyClosed) return toast.error('Bulan ini sudah pernah ditutup buku!');
+    if (closingData.netProfit <= 0) return toast.error('Laba bersih nol atau minus, tidak ada bagi hasil untuk dibagikan.');
+    if (!window.confirm(`Konfirmasi Tutup Buku ${selectedClosingMonth}?\nTotal Laba: ${formatRupiah(closingData.netProfit)}\nSistem akan mendistribusikan bagi hasil ke ${investors.length} investor.`)) return;
+
+    try {
+      setProcessing(true);
+      const dividendRecords = investors.map(inv => ({
+        tanggal: new Date().toISOString().split('T')[0],
+        kategori: 'Bagi Hasil Investor',
+        nama_pengeluaran: `Bagi Hasil ${selectedClosingMonth}: ${inv.nama}`,
+        jumlah: (closingData.netProfit * (Number(inv.persentase) / 100)),
+        rekening_id: accounts.length > 0 ? accounts[0].id : null, // Default to first account
+        catatan: `Otomatis Tutup Buku Bulan ${selectedClosingMonth}. Persentase Saham: ${inv.persentase}%`
+      }));
+
+      const { error } = await supabase.from('kabung_expenses').insert(dividendRecords);
+      if (error) throw error;
+
+      toast.success(`Tutup buku ${selectedClosingMonth} berhasil! Bagi hasil telah dicatat.`);
+      await fetchInitialData();
+    } catch (error) {
+      toast.error('Gagal tutup buku: ' + error.message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // NERACA CALCULATIONS
   const neraca = useMemo(() => {
-    // Assets
     const cashBank = accounts.reduce((sum, acc) => {
-      // Calculate current balance for each account
       let balance = Number(acc.saldo_awal) || 0;
       sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.rekening_id === acc.id).forEach(s => balance += Number(s.total_penjualan));
       incomes.filter(i => i.rekening_id === acc.id).forEach(i => balance += Number(i.jumlah));
@@ -126,14 +173,9 @@ export default function AdminReports() {
       expenses.filter(e => e.rekening_id === acc.id).forEach(e => balance -= Number(e.jumlah));
       return sum + balance;
     }, 0);
-
     const inventoryValue = products.reduce((sum, p) => sum + (Number(p.stok) * Number(p.harga_modal)), 0);
     const totalAssets = cashBank + inventoryValue;
-
-    // Equity
     const totalCapital = investors.reduce((sum, inv) => sum + Number(inv.modal), 0);
-    
-    // Retained Earnings (Simplified: Cumulative Profit since beginning)
     const cumulativeRevenue = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => sum + Number(s.total_penjualan), 0);
     const cumulativeCogs = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => {
       const product = products.find(p => p.id === s.produk_id);
@@ -142,7 +184,6 @@ export default function AdminReports() {
     const cumulativeOpex = expenses.reduce((sum, e) => sum + Number(e.jumlah), 0) + purchases.reduce((sum, p) => sum + Number(p.harga_beli_total), 0);
     const cumulativeOtherInc = incomes.filter(i => i.kategori !== 'Modal Awal').reduce((sum, i) => sum + Number(i.jumlah), 0);
     const retainedEarnings = (cumulativeRevenue - cumulativeCogs - cumulativeOpex + cumulativeOtherInc);
-
     return { cashBank, inventoryValue, totalAssets, totalCapital, retainedEarnings };
   }, [accounts, products, sales, incomes, purchases, expenses, investors]);
 
@@ -152,12 +193,9 @@ export default function AdminReports() {
                  filteredIncomes.filter(i => i.kategori !== 'Modal Awal').reduce((sum, i) => sum + Number(i.jumlah), 0);
     const opOut = filteredExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0) + 
                   filteredPurchases.reduce((sum, p) => sum + Number(p.harga_beli_total), 0);
-    
     const operational = opIn - opOut;
-    const investing = 0; // Asset purchases not tracked yet
     const financing = filteredIncomes.filter(i => i.kategori === 'Modal Awal').reduce((sum, i) => sum + Number(i.jumlah), 0);
-
-    return { operational, investing, financing, net: operational + investing + financing };
+    return { operational, financing, net: operational + financing };
   }, [filteredSales, filteredIncomes, filteredExpenses, filteredPurchases]);
 
   if (loading) {
@@ -178,27 +216,29 @@ export default function AdminReports() {
           <p className="text-xs text-brand-brown/40 font-bold uppercase tracking-widest mt-1">Standar Akuntansi Keuangan (SAK)</p>
         </div>
         
-        <div className="flex flex-wrap gap-3 bg-white p-2 rounded-2xl shadow-sm border border-brand-brown/5">
-          <select 
-            value={filterPeriod} 
-            onChange={(e) => setFilterPeriod(e.target.value)}
-            className="px-4 py-2 bg-brand-brown/5 border-none rounded-xl text-xs font-black uppercase tracking-widest text-brand-brown focus:ring-0 outline-none cursor-pointer"
-          >
-            <option value="Hari ini">Hari ini</option>
-            <option value="Minggu ini">Minggu ini</option>
-            <option value="Bulan ini">Bulan ini</option>
-            <option value="Semua">Semua Waktu</option>
-            <option value="Custom">Custom</option>
-          </select>
-          
-          {filterPeriod === 'Custom' && (
-            <div className="flex items-center gap-2 animate-fade-in">
-              <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="px-3 py-2 bg-brand-brown/5 rounded-xl text-xs font-bold outline-none" />
-              <span className="text-brand-brown/20 font-black">—</span>
-              <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="px-3 py-2 bg-brand-brown/5 rounded-xl text-xs font-bold outline-none" />
-            </div>
-          )}
-        </div>
+        {activeTab !== 'tutupbuku' && (
+          <div className="flex flex-wrap gap-3 bg-white p-2 rounded-2xl shadow-sm border border-brand-brown/5">
+            <select 
+              value={filterPeriod} 
+              onChange={(e) => setFilterPeriod(e.target.value)}
+              className="px-4 py-2 bg-brand-brown/5 border-none rounded-xl text-xs font-black uppercase tracking-widest text-brand-brown focus:ring-0 outline-none cursor-pointer"
+            >
+              <option value="Hari ini">Hari ini</option>
+              <option value="Minggu ini">Minggu ini</option>
+              <option value="Bulan ini">Bulan ini</option>
+              <option value="Semua">Semua Waktu</option>
+              <option value="Custom">Custom</option>
+            </select>
+            
+            {filterPeriod === 'Custom' && (
+              <div className="flex items-center gap-2 animate-fade-in">
+                <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="px-3 py-2 bg-brand-brown/5 rounded-xl text-xs font-bold outline-none" />
+                <span className="text-brand-brown/20 font-black">—</span>
+                <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="px-3 py-2 bg-brand-brown/5 rounded-xl text-xs font-bold outline-none" />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* TABS */}
@@ -206,7 +246,8 @@ export default function AdminReports() {
         {[
           { id: 'labarugi', name: 'Laba Rugi', icon: TrendingUp },
           { id: 'neraca', name: 'Neraca', icon: ShieldCheck },
-          { id: 'aruskas', name: 'Arus Kas', icon: Wallet }
+          { id: 'aruskas', name: 'Arus Kas', icon: Wallet },
+          { id: 'tutupbuku', name: 'Tutup Buku', icon: Lock }
         ].map(tab => (
           <button
             key={tab.id}
@@ -282,7 +323,6 @@ export default function AdminReports() {
       {/* CONTENT: NERACA */}
       {activeTab === 'neraca' && (
         <div className="grid lg:grid-cols-2 gap-8 animate-fade-up">
-          {/* ASSETS */}
           <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-brand-brown/5">
             <div className="flex items-center justify-between mb-10">
               <h3 className="text-xl font-black text-brand-brown flex items-center gap-3">
@@ -306,7 +346,6 @@ export default function AdminReports() {
             </div>
           </div>
 
-          {/* EQUITY */}
           <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-brand-brown/5">
             <div className="flex items-center justify-between mb-10">
               <h3 className="text-xl font-black text-brand-brown flex items-center gap-3">
@@ -331,7 +370,7 @@ export default function AdminReports() {
               </div>
             </div>
             <p className="mt-8 text-[10px] text-brand-brown/30 font-bold uppercase tracking-widest text-center italic">
-              Balance: {neraca.totalAssets === (neraca.totalCapital + neraca.retainedEarnings) ? 'Balanced ✓' : 'Unbalanced ⚠'}
+              Balance: {Math.abs(neraca.totalAssets - (neraca.totalCapital + neraca.retainedEarnings)) < 100 ? 'Balanced ✓' : 'Unbalanced ⚠'}
             </p>
           </div>
         </div>
@@ -348,53 +387,124 @@ export default function AdminReports() {
           </div>
 
           <div className="space-y-12 max-w-3xl">
-            {/* OPERATIONAL */}
             <div>
               <h4 className="text-xs font-black text-brand-gold uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" /> Aktivitas Operasional
               </h4>
               <div className="space-y-4 px-6 border-l-2 border-brand-brown/5">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-brand-brown/60">Penerimaan dari Pelanggan & Lainnya</span>
-                  <span className="text-sm font-black text-emerald-600">+{formatRupiah(filteredSales.reduce((sum,s)=>sum+Number(s.total_penjualan),0) + filteredIncomes.filter(i=>i.kategori!=='Modal Awal').reduce((sum,i)=>sum+Number(i.jumlah),0))}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-brand-brown/60">Pembayaran Beban & Stok</span>
-                  <span className="text-sm font-black text-rose-500">-({formatRupiah(filteredExpenses.reduce((sum,e)=>sum+Number(e.jumlah),0) + filteredPurchases.reduce((sum,p)=>sum+Number(p.harga_beli_total),0))})</span>
-                </div>
-                <div className="flex justify-between items-center pt-2 font-black text-brand-brown">
-                  <span className="text-sm uppercase tracking-widest">Arus Kas Operasional</span>
-                  <span className="text-md underline underline-offset-4">{formatRupiah(cashflow.operational)}</span>
-                </div>
+                <div className="flex justify-between items-center"><span className="text-sm font-bold text-brand-brown/60">Penerimaan dari Pelanggan</span><span className="text-sm font-black text-emerald-600">+{formatRupiah(filteredSales.reduce((sum,s)=>sum+Number(s.total_penjualan),0))}</span></div>
+                <div className="flex justify-between items-center"><span className="text-sm font-bold text-brand-brown/60">Pembayaran Beban & Stok</span><span className="text-sm font-black text-rose-500">-({formatRupiah(filteredExpenses.reduce((sum,e)=>sum+Number(e.jumlah),0) + filteredPurchases.reduce((sum,p)=>sum+Number(p.harga_beli_total),0))})</span></div>
+                <div className="flex justify-between items-center pt-2 font-black text-brand-brown"><span className="text-sm uppercase tracking-widest">Arus Kas Operasional</span><span className="text-md underline underline-offset-4">{formatRupiah(cashflow.operational)}</span></div>
               </div>
             </div>
-
-            {/* FINANCING */}
             <div>
               <h4 className="text-xs font-black text-brand-gold uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4" /> Aktivitas Pendanaan
               </h4>
               <div className="space-y-4 px-6 border-l-2 border-brand-brown/5">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-brand-brown/60">Setoran Modal Investor</span>
-                  <span className="text-sm font-black text-emerald-600">+{formatRupiah(cashflow.financing)}</span>
-                </div>
-                <div className="flex justify-between items-center pt-2 font-black text-brand-brown">
-                  <span className="text-sm uppercase tracking-widest">Arus Kas Pendanaan</span>
-                  <span className="text-md underline underline-offset-4">{formatRupiah(cashflow.financing)}</span>
-                </div>
+                <div className="flex justify-between items-center"><span className="text-sm font-bold text-brand-brown/60">Setoran Modal Investor</span><span className="text-sm font-black text-emerald-600">+{formatRupiah(cashflow.financing)}</span></div>
+                <div className="flex justify-between items-center pt-2 font-black text-brand-brown"><span className="text-sm uppercase tracking-widest">Arus Kas Pendanaan</span><span className="text-md underline underline-offset-4">{formatRupiah(cashflow.financing)}</span></div>
               </div>
             </div>
-
-            {/* NET */}
             <div className="pt-10 border-t-4 border-double border-brand-brown/10">
               <div className="flex justify-between items-center p-8 bg-brand-brown rounded-3xl text-white shadow-2xl">
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-60">Kenaikan/Penurunan Kas Neto</span>
-                  <h4 className="text-4xl font-black tracking-tighter mt-1">{formatRupiah(cashflow.net)}</h4>
-                </div>
+                <div><span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-60">Kenaikan/Penurunan Kas Neto</span><h4 className="text-4xl font-black tracking-tighter mt-1">{formatRupiah(cashflow.net)}</h4></div>
                 <Wallet className="w-12 h-12 text-brand-gold opacity-40" />
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONTENT: TUTUP BUKU */}
+      {activeTab === 'tutupbuku' && (
+        <div className="grid lg:grid-cols-12 gap-8 animate-fade-up">
+          <div className="lg:col-span-8 space-y-6">
+            <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-brand-brown/5">
+              <div className="flex justify-between items-center mb-10">
+                <h3 className="text-xl font-black text-brand-brown flex items-center gap-3">
+                  <Lock className="w-6 h-6 text-brand-gold" /> Proses Tutup Buku
+                </h3>
+                <input 
+                  type="month" 
+                  value={selectedClosingMonth}
+                  onChange={(e) => setSelectedClosingMonth(e.target.value)}
+                  className="px-4 py-2 bg-brand-brown/5 rounded-xl text-xs font-black uppercase tracking-widest text-brand-brown outline-none"
+                />
+              </div>
+
+              {closingData.isAlreadyClosed ? (
+                <div className="bg-emerald-50 border border-emerald-100 p-8 rounded-3xl flex items-center gap-6 mb-10">
+                  <div className="w-16 h-16 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-10 h-10" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-emerald-900">Bulan Ini Sudah Ditutup</h4>
+                    <p className="text-sm text-emerald-700/60 mt-1">Bagi hasil untuk investor telah didistribusikan ke dalam catatan pengeluaran.</p>
+                  </div>
+                </div>
+              ) : closingData.netProfit <= 0 ? (
+                <div className="bg-rose-50 border border-rose-100 p-8 rounded-3xl flex items-center gap-6 mb-10">
+                  <div className="w-16 h-16 bg-rose-500 text-white rounded-2xl flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-10 h-10" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-rose-900">Tidak Ada Laba Tersedia</h4>
+                    <p className="text-sm text-rose-700/60 mt-1">Hanya bulan dengan laba positif yang dapat melakukan proses tutup buku dan bagi hasil.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-brand-brown/5 p-8 rounded-3xl mb-10">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-xs font-black text-brand-brown/40 uppercase tracking-widest">Laba Bersih Tersedia ({selectedClosingMonth})</span>
+                    <span className="text-2xl font-black text-brand-brown">{formatRupiah(closingData.netProfit)}</span>
+                  </div>
+                  <p className="text-[10px] text-brand-brown/30 font-bold uppercase tracking-widest italic">Profit ini akan dibagikan kepada seluruh investor sesuai porsi saham mereka.</p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <h4 className="text-xs font-black text-brand-brown/40 uppercase tracking-widest mb-4">Daftar Penerima Bagi Hasil</h4>
+                <div className="divide-y divide-brand-brown/5 bg-brand-brown/[0.02] rounded-3xl overflow-hidden border border-brand-brown/5">
+                  {investors.map(inv => (
+                    <div key={inv.id} className="p-6 flex justify-between items-center group hover:bg-white transition-colors">
+                      <div>
+                        <p className="font-black text-brand-brown">{inv.nama}</p>
+                        <p className="text-[10px] font-bold text-brand-brown/30 uppercase tracking-widest mt-1">Porsi Saham: {inv.persentase}%</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-brand-gold text-lg">
+                          {formatRupiah(closingData.netProfit > 0 ? (closingData.netProfit * (Number(inv.persentase) / 100)) : 0)}
+                        </p>
+                        <p className="text-[10px] font-bold text-brand-brown/20 uppercase">Estimasi Transfer</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {!closingData.isAlreadyClosed && closingData.netProfit > 0 && (
+                <button 
+                  onClick={handleTutupBuku}
+                  disabled={processing}
+                  className="w-full mt-12 py-6 bg-brand-brown text-white rounded-3xl font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-brand-gold hover:text-brand-brown transition-all flex items-center justify-center gap-4 disabled:opacity-50"
+                >
+                  {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
+                  Proses Tutup Buku & Bagi Hasil
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-brand-gold rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60 mb-4">Informasi</h4>
+              <p className="text-sm font-bold leading-relaxed mb-6">Proses Tutup Buku berfungsi untuk mencatat pembagian keuntungan bulanan sebagai pengeluaran resmi bisnis.</p>
+              <ul className="space-y-3">
+                <li className="flex items-start gap-3 text-[10px] font-black uppercase tracking-widest"><ShieldCheck className="w-4 h-4 shrink-0" /> Otomatis Tercatat di Keuangan</li>
+                <li className="flex items-start gap-3 text-[10px] font-black uppercase tracking-widest"><ShieldCheck className="w-4 h-4 shrink-0" /> Saldo Kas Akan Berkurang</li>
+                <li className="flex items-start gap-3 text-[10px] font-black uppercase tracking-widest"><ShieldCheck className="w-4 h-4 shrink-0" /> Mencegah Distribusi Ganda</li>
+              </ul>
             </div>
           </div>
         </div>
