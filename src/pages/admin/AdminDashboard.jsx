@@ -106,7 +106,7 @@ export default function AdminDashboard() {
         if (sale.tanggal && sale.tanggal.startsWith(thisMonth)) {
           sMonth += val;
           txCount++;
-          pcsOut += Number(sale.jumlah_produk || 0);
+          pcsOut += Number(sale.jumlah || 0);
         }
       }
     });
