@@ -40,19 +40,13 @@ export default function AdminDashboard() {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        console.log('AdminDashboard: Initializing data fetch...');
-
-        // Fetching with individual error handling to prevent total crash
+        
         const fetchTable = async (tableName) => {
           try {
             const { data, error } = await supabase.from(tableName).select('*');
-            if (error) {
-              console.warn(`AdminDashboard: Error fetching ${tableName}:`, error.message);
-              return [];
-            }
+            if (error) return [];
             return data || [];
           } catch (e) {
-            console.warn(`AdminDashboard: Exception fetching ${tableName}:`, e.message);
             return [];
           }
         };
@@ -77,10 +71,9 @@ export default function AdminDashboard() {
           setAccounts(acc);
           setMutations(mut);
           setReceiving(rec);
-          console.log('AdminDashboard: All data loaded successfully');
         }
       } catch (err) {
-        console.error('AdminDashboard: Critical data fetch error:', err);
+        console.error('AdminDashboard: Data fetch error:', err);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -96,17 +89,23 @@ export default function AdminDashboard() {
     let sMonth = 0;
     let eMonth = 0;
     let txCount = 0;
-    let pcsIn = 0;
-    let pcsOut = 0;
+    let pcsInMonth = 0;
+    let pcsOutMonth = 0;
+    let pcsInAllTime = 0;
+    let pcsOutAllTime = 0;
 
     (sales || []).forEach(sale => {
       if (sale && sale.status_pembayaran === 'Sudah bayar') {
         const val = Number(sale.total_penjualan || 0);
+        const qty = Number(sale.jumlah || 0);
+        
+        pcsOutAllTime += qty;
+        
         if (sale.tanggal === today) sToday += val;
         if (sale.tanggal && sale.tanggal.startsWith(thisMonth)) {
           sMonth += val;
           txCount++;
-          pcsOut += Number(sale.jumlah || 0);
+          pcsOutMonth += qty;
         }
       }
     });
@@ -134,8 +133,10 @@ export default function AdminDashboard() {
     });
 
     (receiving || []).forEach(r => {
+      const qty = Number(r.jumlah_terima || 0);
+      pcsInAllTime += qty;
       if (r && r.tanggal_terima && r.tanggal_terima.startsWith(thisMonth)) {
-        pcsIn += Number(r.jumlah_terima || 0);
+        pcsInMonth += qty;
       }
     });
 
@@ -147,8 +148,10 @@ export default function AdminDashboard() {
       expensesThisMonth: eMonth,
       txCountThisMonth: txCount,
       profitLoss: sMonth - eMonth,
-      totalPcsIn: pcsIn,
-      totalPcsOut: pcsOut,
+      pcsInMonth,
+      pcsOutMonth,
+      pcsInAllTime,
+      pcsOutAllTime,
       totalPcsBalance: totalBalance
     };
   }, [sales, expenses, purchases, incomes, receiving, products, today, thisMonth]);
@@ -299,19 +302,21 @@ export default function AdminDashboard() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-5 bg-emerald-50 rounded-3xl border border-emerald-100">
+                <div className="p-5 bg-emerald-50 rounded-3xl border border-emerald-100 flex flex-col">
                   <div className="flex items-center gap-2 mb-2 text-emerald-600">
                     <ArrowDownRight className="w-4 h-4" />
                     <span className="text-[9px] font-black uppercase tracking-widest text-center">Masuk</span>
                   </div>
-                  <h4 className="text-2xl font-black text-emerald-700">{stats.totalPcsIn} <span className="text-[10px]">pcs</span></h4>
+                  <h4 className="text-2xl font-black text-emerald-700">{stats.pcsInMonth} <span className="text-[10px]">pcs</span></h4>
+                  <p className="text-[9px] font-bold text-emerald-600/40 mt-1">All: {stats.pcsInAllTime}</p>
                 </div>
-                <div className="p-5 bg-rose-50 rounded-3xl border border-rose-100">
+                <div className="p-5 bg-rose-50 rounded-3xl border border-rose-100 flex flex-col">
                   <div className="flex items-center gap-2 mb-2 text-rose-600">
                     <ArrowUpRight className="w-4 h-4" />
                     <span className="text-[9px] font-black uppercase tracking-widest text-center">Keluar</span>
                   </div>
-                  <h4 className="text-2xl font-black text-rose-700">{stats.totalPcsOut} <span className="text-[10px]">pcs</span></h4>
+                  <h4 className="text-2xl font-black text-rose-700">{stats.pcsOutMonth} <span className="text-[10px]">pcs</span></h4>
+                  <p className="text-[9px] font-bold text-rose-600/40 mt-1">All: {stats.pcsOutAllTime}</p>
                 </div>
               </div>
             </div>
