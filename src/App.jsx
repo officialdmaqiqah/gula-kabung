@@ -20,6 +20,7 @@ import AdminFinances from './pages/admin/AdminFinances';
 import AdminReports from './pages/admin/AdminReports';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminReceiving from './pages/admin/AdminReceiving';
+import AdminMutations from './pages/admin/AdminMutations';
 
 function App() {
   const location = useLocation();
@@ -81,6 +82,7 @@ function App() {
               <Route path="sales" element={<AdminSales />} />
               <Route path="finances" element={<AdminFinances />} />
               <Route path="reports" element={<AdminReports />} />
+              <Route path="mutations" element={<AdminMutations />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
           </Routes>

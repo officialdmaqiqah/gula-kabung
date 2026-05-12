@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Edit, Trash2, Download, ArrowUpRight, ArrowDownRight, Wallet, Loader2, XCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Download, ArrowUpRight, ArrowDownRight, Wallet, Loader2, ArrowRightLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
 
@@ -9,6 +9,7 @@ export default function AdminFinances() {
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [mutations, setMutations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,12 +39,14 @@ export default function AdminFinances() {
       const { data: expensesData } = await supabase.from('kabung_expenses').select('*');
       const { data: incomesData } = await supabase.from('kabung_incomes').select('*');
       const { data: accountsData } = await supabase.from('kabung_accounts').select('*');
+      const { data: mutationsData } = await supabase.from('kabung_mutations').select('*');
 
       setSales(salesData || []);
       setPurchases(purchasesData || []);
       setExpenses(expensesData || []);
       setIncomes(incomesData || []);
       setAccounts(accountsData || []);
+      setMutations(mutationsData || []);
 
       if (accountsData?.length > 0) {
         const firstId = accountsData[0].id;
@@ -209,7 +212,8 @@ export default function AdminFinances() {
         id: `sale-${s.id}`, rawId: s.id, type: 'INCOME', source: 'sale',
         tanggal: s.tanggal, kategori: 'Penjualan Produk',
         keterangan: `Penjualan: ${s.nama_pembeli} (${s.nama_produk})`,
-        jumlah: Number(s.total_penjualan)
+        jumlah: Number(s.total_penjualan),
+        rekeningId: s.rekening_id
       });
     });
 
@@ -219,7 +223,8 @@ export default function AdminFinances() {
         id: `pur-${p.id}`, rawId: p.id, type: 'EXPENSE', source: 'purchase',
         tanggal: p.tanggal, kategori: 'Pembelian Stok',
         keterangan: `Restock: ${p.nama_produk} dari ${p.nama_petani}`,
-        jumlah: Number(p.harga_beli_total)
+        jumlah: Number(p.harga_beli_total),
+        rekeningId: p.rekening_id
       });
     });
 
@@ -229,7 +234,8 @@ export default function AdminFinances() {
         id: `inc-${i.id}`, rawId: i.id, type: 'INCOME', source: 'manual_inc',
         tanggal: i.tanggal, kategori: i.kategori,
         keterangan: i.nama_pemasukan,
-        jumlah: Number(i.jumlah), rawData: i
+        jumlah: Number(i.jumlah), rawData: i,
+        rekeningId: i.rekening_id
       });
     });
 
@@ -239,7 +245,21 @@ export default function AdminFinances() {
         id: `exp-${e.id}`, rawId: e.id, type: 'EXPENSE', source: 'manual_exp',
         tanggal: e.tanggal, kategori: e.kategori,
         keterangan: e.nama_pengeluaran,
-        jumlah: Number(e.jumlah), rawData: e
+        jumlah: Number(e.jumlah), rawData: e,
+        rekeningId: e.rekening_id
+      });
+    });
+
+    // 5. Mutations
+    mutations.forEach(m => {
+      const dari = accounts.find(a => a.id === m.dari_rekening_id)?.nama_rekening || 'Account';
+      const ke = accounts.find(a => a.id === m.ke_rekening_id)?.nama_rekening || 'Account';
+      
+      list.push({
+        id: `mut-${m.id}`, rawId: m.id, type: 'MUTATION', source: 'mutation',
+        tanggal: m.tanggal, kategori: 'Mutasi Uang',
+        keterangan: `Mutasi: ${dari} ke ${ke}`,
+        jumlah: Number(m.jumlah), rawData: m
       });
     });
 
@@ -252,13 +272,13 @@ export default function AdminFinances() {
     }
 
     return list;
-  }, [sales, purchases, incomes, expenses, filterMonth]);
+  }, [sales, purchases, incomes, expenses, mutations, filterMonth, accounts]);
 
   const { totalIn, totalOut } = useMemo(() => {
     let tIn = 0; let tOut = 0;
     allTransactions.forEach(t => {
       if (t.type === 'INCOME') tIn += t.jumlah;
-      else tOut += t.jumlah;
+      else if (t.type === 'EXPENSE') tOut += t.jumlah;
     });
     return { totalIn: tIn, totalOut: tOut };
   }, [allTransactions]);
@@ -268,7 +288,7 @@ export default function AdminFinances() {
     const headers = ['Tanggal', 'Tipe', 'Kategori', 'Keterangan', 'Pemasukan', 'Pengeluaran'];
     const rows = allTransactions.map(t => [
       t.tanggal,
-      t.type === 'INCOME' ? 'Pemasukan' : 'Pengeluaran',
+      t.type === 'INCOME' ? 'Pemasukan' : t.type === 'EXPENSE' ? 'Pengeluaran' : 'Mutasi',
       t.kategori,
       `"${t.keterangan.replace(/"/g, '""')}"`, // escape quotes
       t.type === 'INCOME' ? t.jumlah : 0,
@@ -370,9 +390,14 @@ export default function AdminFinances() {
                     <div className="font-medium text-brand-brown">{t.keterangan}</div>
                     <div className="flex gap-2 items-center mt-1">
                       <div className="text-xs inline-block px-2 py-0.5 bg-brand-brown/10 text-brand-brown rounded-full">{t.kategori}</div>
-                      {t.rawData && t.rawData.rekening_id && (
+                      {t.rekeningId && (
                         <div className="text-xs inline-block px-2 py-0.5 border border-brand-brown/20 text-brand-brown/50 rounded-full">
-                          {accounts.find(a => a.id === t.rawData.rekening_id)?.nama_rekening || 'Kas'}
+                          {accounts.find(a => a.id === t.rekeningId)?.nama_rekening || 'Kas'}
+                        </div>
+                      )}
+                      {t.type === 'MUTATION' && (
+                        <div className="text-xs inline-block px-2 py-0.5 bg-brand-gold/10 text-brand-gold rounded-full flex items-center gap-1">
+                          <ArrowRightLeft className="w-3 h-3" /> Mutasi
                         </div>
                       )}
                     </div>
@@ -396,7 +421,7 @@ export default function AdminFinances() {
                         <button onClick={() => handleDeleteIncome(t.rawId)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-md"><Trash2 className="w-4 h-4" /></button>
                       </>
                     )}
-                    {(t.source === 'sale' || t.source === 'purchase') && (
+                    {(t.source === 'sale' || t.source === 'purchase' || t.source === 'mutation') && (
                       <span className="text-xs text-brand-brown/40 italic">Otomatis</span>
                     )}
                   </td>

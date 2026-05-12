@@ -13,7 +13,8 @@ import {
   Wallet,
   Settings,
   User,
-  Truck
+  Truck,
+  ArrowRightLeft
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -38,6 +39,7 @@ export default function AdminLayout() {
     { name: 'Penerimaan Barang', path: '/admin/receiving', icon: Truck },
     { name: 'Penjualan', path: '/admin/sales', icon: ShoppingCart },
     { name: 'Pencatatan Keuangan', path: '/admin/finances', icon: Wallet },
+    { name: 'Mutasi Uang', path: '/admin/mutations', icon: ArrowRightLeft },
     { name: 'Laporan Laba Rugi', path: '/admin/reports', icon: BarChart3 },
     { name: 'Pengaturan', path: '/admin/settings', icon: Settings },
   ];
