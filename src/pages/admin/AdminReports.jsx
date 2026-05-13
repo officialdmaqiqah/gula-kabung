@@ -13,6 +13,7 @@ export default function AdminReports() {
   const [products, setProducts] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [investors, setInvestors] = useState([]);
+  const [mutations, setMutations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   
@@ -37,7 +38,8 @@ export default function AdminReports() {
         { data: iData },
         { data: prodData },
         { data: accData },
-        { data: invData }
+        { data: invData },
+        { data: mutData }
       ] = await Promise.all([
         supabase.from('kabung_sales').select('*'),
         supabase.from('kabung_purchases').select('*'),
@@ -45,7 +47,8 @@ export default function AdminReports() {
         supabase.from('kabung_incomes').select('*'),
         supabase.from('kabung_products').select('*'),
         supabase.from('kabung_accounts').select('*'),
-        supabase.from('kabung_investors').select('*')
+        supabase.from('kabung_investors').select('*'),
+        supabase.from('kabung_mutations').select('*')
       ]);
 
       setSales(sData || []);
@@ -55,6 +58,7 @@ export default function AdminReports() {
       setProducts(prodData || []);
       setAccounts(accData || []);
       setInvestors(invData || []);
+      setMutations(mutData || []);
     } catch (error) {
       console.error('Error fetching data for reports:', error.message);
     } finally {
@@ -101,21 +105,23 @@ export default function AdminReports() {
       return sum + (costPerItem * Number(s.jumlah));
     }, 0);
     const grossProfit = revenue - cogs;
-    const opex = filteredExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0) + 
-                 filteredPurchases.reduce((sum, p) => sum + Number(p.harga_beli_total), 0);
+    
+    // Opex: Only expenses, not purchases (Purchases affect inventory & cash, not directly P&L)
+    const opex = filteredExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
+    
     const otherIncome = filteredIncomes.reduce((sum, i) => {
       if (i.kategori === 'Modal Awal') return sum;
       return sum + Number(i.jumlah);
     }, 0);
+    
     const netProfit = grossProfit - opex + otherIncome;
     return { revenue, cogs, grossProfit, opex, otherIncome, netProfit };
   }, [filteredSales, filteredExpenses, filteredPurchases, filteredIncomes, products]);
 
-  // TUTUP BUKU CALCULATIONS (Specific to selected month)
+  // TUTUP BUKU CALCULATIONS
   const closingData = useMemo(() => {
     const monthSales = sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.tanggal.startsWith(selectedClosingMonth));
     const monthExpenses = expenses.filter(e => e.tanggal.startsWith(selectedClosingMonth));
-    const monthPurchases = purchases.filter(p => p.tanggal.startsWith(selectedClosingMonth));
     const monthIncomes = incomes.filter(i => i.tanggal.startsWith(selectedClosingMonth) && i.kategori !== 'Modal Awal');
 
     const revenue = monthSales.reduce((sum, s) => sum + Number(s.total_penjualan), 0);
@@ -123,17 +129,14 @@ export default function AdminReports() {
       const product = products.find(p => p.id === s.produk_id);
       return sum + ((product ? Number(product.harga_modal) : 0) * Number(s.jumlah));
     }, 0);
-    const opex = monthExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0) + 
-                 monthPurchases.reduce((sum, p) => sum + Number(p.harga_beli_total), 0);
+    const opex = monthExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
     const otherInc = monthIncomes.reduce((sum, i) => sum + Number(i.jumlah), 0);
     
     const netProfit = (revenue - cogs - opex + otherInc);
-
-    // Check if already closed (Search for "Bagi Hasil" expenses for this month)
     const isAlreadyClosed = monthExpenses.some(e => e.kategori === 'Bagi Hasil Investor');
 
     return { netProfit, isAlreadyClosed };
-  }, [selectedClosingMonth, sales, expenses, purchases, incomes, products]);
+  }, [selectedClosingMonth, sales, expenses, incomes, products]);
 
   const handleTutupBuku = async () => {
     if (closingData.isAlreadyClosed) return toast.error('Bulan ini sudah pernah ditutup buku!');
@@ -147,7 +150,7 @@ export default function AdminReports() {
         kategori: 'Bagi Hasil Investor',
         nama_pengeluaran: `Bagi Hasil ${selectedClosingMonth}: ${inv.nama}`,
         jumlah: (closingData.netProfit * (Number(inv.persentase) / 100)),
-        rekening_id: accounts.length > 0 ? accounts[0].id : null, // Default to first account
+        rekening_id: accounts.length > 0 ? accounts[0].id : null,
         catatan: `Otomatis Tutup Buku Bulan ${selectedClosingMonth}. Persentase Saham: ${inv.persentase}%`
       }));
 
@@ -165,27 +168,45 @@ export default function AdminReports() {
 
   // NERACA CALCULATIONS
   const neraca = useMemo(() => {
+    // 1. ASSETS: Cash & Bank (Realtime calculation including mutations)
     const cashBank = accounts.reduce((sum, acc) => {
       let balance = Number(acc.saldo_awal) || 0;
+      
       sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.rekening_id === acc.id).forEach(s => balance += Number(s.total_penjualan));
       incomes.filter(i => i.rekening_id === acc.id).forEach(i => balance += Number(i.jumlah));
       purchases.filter(p => p.rekening_id === acc.id).forEach(p => balance -= Number(p.harga_beli_total));
       expenses.filter(e => e.rekening_id === acc.id).forEach(e => balance -= Number(e.jumlah));
+      
+      // Mutations
+      mutations.filter(m => m.dari_rekening_id === acc.id).forEach(m => balance -= Number(m.jumlah));
+      mutations.filter(m => m.ke_rekening_id === acc.id).forEach(m => balance += Number(m.jumlah));
+      
       return sum + balance;
     }, 0);
+
+    // 2. ASSETS: Inventory Value
     const inventoryValue = products.reduce((sum, p) => sum + (Number(p.stok) * Number(p.harga_modal)), 0);
     const totalAssets = cashBank + inventoryValue;
+
+    // 3. EQUITY: Total Capital (Investors)
     const totalCapital = investors.reduce((sum, inv) => sum + Number(inv.modal), 0);
+
+    // 4. EQUITY: Retained Earnings (Cumulative Profit)
     const cumulativeRevenue = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => sum + Number(s.total_penjualan), 0);
     const cumulativeCogs = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => {
       const product = products.find(p => p.id === s.produk_id);
       return sum + ((product ? Number(product.harga_modal) : 0) * Number(s.jumlah));
     }, 0);
-    const cumulativeOpex = expenses.reduce((sum, e) => sum + Number(e.jumlah), 0) + purchases.reduce((sum, p) => sum + Number(p.harga_beli_total), 0);
+    
+    // IMPORTANT: Profit only reduced by expenses, NOT purchases (Purchases are already in Cash & Inventory)
+    const cumulativeOpex = expenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
     const cumulativeOtherInc = incomes.filter(i => i.kategori !== 'Modal Awal').reduce((sum, i) => sum + Number(i.jumlah), 0);
+    
     const retainedEarnings = (cumulativeRevenue - cumulativeCogs - cumulativeOpex + cumulativeOtherInc);
-    return { cashBank, inventoryValue, totalAssets, totalCapital, retainedEarnings };
-  }, [accounts, products, sales, incomes, purchases, expenses, investors]);
+    const totalEquity = totalCapital + retainedEarnings;
+
+    return { cashBank, inventoryValue, totalAssets, totalCapital, retainedEarnings, totalEquity };
+  }, [accounts, products, sales, incomes, purchases, expenses, investors, mutations]);
 
   // ARUS KAS CALCULATIONS
   const cashflow = useMemo(() => {
@@ -288,7 +309,7 @@ export default function AdminReports() {
                 </div>
 
                 <div className="flex justify-between items-center group pt-4">
-                  <span className="text-sm font-bold text-brand-brown/60 uppercase tracking-widest">Beban Operasional & Stok</span>
+                  <span className="text-sm font-bold text-brand-brown/60 uppercase tracking-widest">Beban Operasional</span>
                   <span className="text-lg font-black text-rose-500">({formatRupiah(pnl.opex)})</span>
                 </div>
                 <div className="flex justify-between items-center group pb-6 border-b border-brand-brown/5">
@@ -366,11 +387,11 @@ export default function AdminReports() {
               </div>
               <div className="flex justify-between items-center pt-4 bg-brand-brown text-white p-6 rounded-2xl shadow-xl">
                 <span className="text-sm font-black uppercase tracking-widest opacity-60">Total Pasiva</span>
-                <span className="text-2xl font-black">{formatRupiah(neraca.totalCapital + neraca.retainedEarnings)}</span>
+                <span className="text-2xl font-black">{formatRupiah(neraca.totalEquity)}</span>
               </div>
             </div>
             <p className="mt-8 text-[10px] text-brand-brown/30 font-bold uppercase tracking-widest text-center italic">
-              Balance: {Math.abs(neraca.totalAssets - (neraca.totalCapital + neraca.retainedEarnings)) < 100 ? 'Balanced ✓' : 'Unbalanced ⚠'}
+              Balance: {Math.abs(neraca.totalAssets - neraca.totalEquity) < 100 ? 'Balanced ✓' : 'Unbalanced ⚠'}
             </p>
           </div>
         </div>
