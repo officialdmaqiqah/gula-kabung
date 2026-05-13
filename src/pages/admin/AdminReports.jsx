@@ -18,6 +18,7 @@ export default function AdminReports() {
   const [processing, setProcessing] = useState(false);
   
   const [filterPeriod, setFilterPeriod] = useState('Bulan ini');
+  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().substring(0, 7));
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
@@ -82,6 +83,7 @@ export default function AdminReports() {
       if (filterPeriod === 'Hari ini') return item.tanggal === todayStr;
       if (filterPeriod === 'Minggu ini') return item.tanggal >= startOfWeekStr && item.tanggal <= todayStr;
       if (filterPeriod === 'Bulan ini') return item.tanggal >= startOfMonthStr && item.tanggal <= todayStr;
+      if (filterPeriod === 'Pilih Bulan') return item.tanggal.startsWith(filterMonth);
       if (filterPeriod === 'Custom') {
         if (!customStartDate || !customEndDate) return false;
         return item.tanggal >= customStartDate && item.tanggal <= customEndDate;
@@ -95,7 +97,7 @@ export default function AdminReports() {
       filteredPurchases: filter(purchases),
       filteredIncomes: filter(incomes)
     };
-  }, [sales, expenses, purchases, incomes, filterPeriod, customStartDate, customEndDate]);
+  }, [sales, expenses, purchases, incomes, filterPeriod, filterMonth, customStartDate, customEndDate]);
 
   // LABA RUGI CALCULATIONS
   const pnl = useMemo(() => {
@@ -240,9 +242,27 @@ export default function AdminReports() {
               <option value="Hari ini">Hari ini</option>
               <option value="Minggu ini">Minggu ini</option>
               <option value="Bulan ini">Bulan ini</option>
+              <option value="Pilih Bulan">Pilih Bulan</option>
               <option value="Semua">Semua Waktu</option>
               <option value="Custom">Custom</option>
             </select>
+            
+            {filterPeriod === 'Pilih Bulan' && (
+              <input 
+                type="month" 
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+                className="px-3 py-2 bg-brand-brown/5 border-none rounded-xl text-xs font-bold outline-none animate-fade-in"
+              />
+            )}
+
+            {filterPeriod === 'Custom' && (
+              <div className="flex items-center gap-2 animate-fade-in">
+                <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="px-3 py-2 bg-brand-brown/5 rounded-xl text-xs font-bold outline-none" />
+                <span className="text-brand-brown/20 font-black">—</span>
+                <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="px-3 py-2 bg-brand-brown/5 rounded-xl text-xs font-bold outline-none" />
+              </div>
+            )}
           </div>
         )}
       </div>
