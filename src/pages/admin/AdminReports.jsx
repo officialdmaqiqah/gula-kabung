@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
-import { FileText, Calendar, Download, Loader2, PieChart, TrendingUp, Wallet, ShieldCheck, Briefcase, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { FileText, Calendar, Download, Loader2, PieChart, TrendingUp, Wallet, ShieldCheck, Briefcase, Lock, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function AdminReports() {
@@ -105,15 +105,11 @@ export default function AdminReports() {
       return sum + (costPerItem * Number(s.jumlah));
     }, 0);
     const grossProfit = revenue - cogs;
-    
-    // Opex: Only expenses, not purchases (Purchases affect inventory & cash, not directly P&L)
     const opex = filteredExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
-    
     const otherIncome = filteredIncomes.reduce((sum, i) => {
       if (i.kategori === 'Modal Awal') return sum;
       return sum + Number(i.jumlah);
     }, 0);
-    
     const netProfit = grossProfit - opex + otherIncome;
     return { revenue, cogs, grossProfit, opex, otherIncome, netProfit };
   }, [filteredSales, filteredExpenses, filteredPurchases, filteredIncomes, products]);
@@ -168,44 +164,45 @@ export default function AdminReports() {
 
   // NERACA CALCULATIONS
   const neraca = useMemo(() => {
-    // 1. ASSETS: Cash & Bank (Realtime calculation including mutations)
+    // 1. ASSETS: Cash & Bank
     const cashBank = accounts.reduce((sum, acc) => {
       let balance = Number(acc.saldo_awal) || 0;
-      
       sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.rekening_id === acc.id).forEach(s => balance += Number(s.total_penjualan));
       incomes.filter(i => i.rekening_id === acc.id).forEach(i => balance += Number(i.jumlah));
       purchases.filter(p => p.rekening_id === acc.id).forEach(p => balance -= Number(p.harga_beli_total));
       expenses.filter(e => e.rekening_id === acc.id).forEach(e => balance -= Number(e.jumlah));
-      
-      // Mutations
       mutations.filter(m => m.dari_rekening_id === acc.id).forEach(m => balance -= Number(m.jumlah));
       mutations.filter(m => m.ke_rekening_id === acc.id).forEach(m => balance += Number(m.jumlah));
-      
       return sum + balance;
     }, 0);
 
-    // 2. ASSETS: Inventory Value
+    // 2. ASSETS: Inventory Value (Goods on hand)
     const inventoryValue = products.reduce((sum, p) => sum + (Number(p.stok) * Number(p.harga_modal)), 0);
-    const totalAssets = cashBank + inventoryValue;
 
-    // 3. EQUITY: Total Capital (Investors)
-    const totalCapital = investors.reduce((sum, inv) => sum + Number(inv.modal), 0);
-
-    // 4. EQUITY: Retained Earnings (Cumulative Profit)
-    const cumulativeRevenue = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => sum + Number(s.total_penjualan), 0);
+    // 3. ASSETS: Goods in Transit / PO Value (Uang Muka)
+    // Formula: Total Paid Purchases - Total COGS - Current Inventory Value
+    // This represents money spent on items that haven't been sold yet and are not in current stock
+    const totalPurchasesValue = purchases.reduce((sum, p) => sum + Number(p.harga_beli_total), 0);
     const cumulativeCogs = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => {
       const product = products.find(p => p.id === s.produk_id);
       return sum + ((product ? Number(product.harga_modal) : 0) * Number(s.jumlah));
     }, 0);
     
-    // IMPORTANT: Profit only reduced by expenses, NOT purchases (Purchases are already in Cash & Inventory)
+    // Uang Muka = Total pengeluaran beli stok - yang sudah jadi HPP - yang sudah ada di rak stok
+    const goodsInTransit = totalPurchasesValue - cumulativeCogs - inventoryValue;
+    
+    const totalAssets = cashBank + inventoryValue + Math.max(0, goodsInTransit);
+
+    // 4. EQUITY
+    const totalCapital = investors.reduce((sum, inv) => sum + Number(inv.modal), 0);
+    const cumulativeRevenue = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => sum + Number(s.total_penjualan), 0);
     const cumulativeOpex = expenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
     const cumulativeOtherInc = incomes.filter(i => i.kategori !== 'Modal Awal').reduce((sum, i) => sum + Number(i.jumlah), 0);
     
     const retainedEarnings = (cumulativeRevenue - cumulativeCogs - cumulativeOpex + cumulativeOtherInc);
     const totalEquity = totalCapital + retainedEarnings;
 
-    return { cashBank, inventoryValue, totalAssets, totalCapital, retainedEarnings, totalEquity };
+    return { cashBank, inventoryValue, goodsInTransit: Math.max(0, goodsInTransit), totalAssets, totalCapital, retainedEarnings, totalEquity };
   }, [accounts, products, sales, incomes, purchases, expenses, investors, mutations]);
 
   // ARUS KAS CALCULATIONS
@@ -356,9 +353,16 @@ export default function AdminReports() {
                 <span className="text-sm font-bold text-brand-brown/60 uppercase tracking-widest">Kas & Bank</span>
                 <span className="text-lg font-black text-brand-brown">{formatRupiah(neraca.cashBank)}</span>
               </div>
-              <div className="flex justify-between items-center pb-6 border-b border-brand-brown/5">
+              <div className="flex justify-between items-center">
                 <span className="text-sm font-bold text-brand-brown/60 uppercase tracking-widest">Persediaan Barang</span>
                 <span className="text-lg font-black text-brand-brown">{formatRupiah(neraca.inventoryValue)}</span>
+              </div>
+              <div className="flex justify-between items-center pb-6 border-b border-brand-brown/5">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-brand-brown/60 uppercase tracking-widest">Pesanan dalam Proses (PO)</span>
+                  <Clock className="w-3 h-3 text-brand-gold" />
+                </div>
+                <span className="text-lg font-black text-brand-gold">{formatRupiah(neraca.goodsInTransit)}</span>
               </div>
               <div className="flex justify-between items-center pt-4 bg-brand-brown/5 p-6 rounded-2xl">
                 <span className="text-sm font-black text-brand-brown uppercase tracking-widest">Total Aktiva</span>
