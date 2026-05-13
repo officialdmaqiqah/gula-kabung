@@ -207,37 +207,7 @@ export default function AdminDashboard() {
   try {
     return (
       <div className="space-y-6 pb-4">
-        {/* Quick Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {[
-            { label: 'Pemasukan Hari Ini', value: formatRupiah(stats.salesToday), icon: DollarSign, color: 'emerald' },
-            { label: 'Pemasukan Bulan Ini', value: formatRupiah(stats.salesThisMonth), icon: TrendingUp, color: 'brand-gold' },
-            { label: 'Pengeluaran Bulan Ini', value: formatRupiah(stats.expensesThisMonth), icon: TrendingDown, color: 'rose' },
-            { label: 'Transaksi Bulan Ini', value: stats.txCountThisMonth, icon: ShoppingBag, color: 'indigo' },
-          ].map((stat, i) => {
-            const colorMap = {
-              emerald: 'bg-emerald-50 text-emerald-600',
-              'brand-gold': 'bg-brand-gold/10 text-brand-gold',
-              rose: 'bg-rose-50 text-rose-600',
-              indigo: 'bg-indigo-50 text-indigo-600',
-            };
-            const colorClass = colorMap[stat.color] || colorMap.emerald;
-            
-            return (
-              <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-black/5 group hover:border-brand-gold/30 transition-all">
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`p-3 rounded-2xl group-hover:scale-110 transition-all duration-500 ${colorClass}`}>
-                    <stat.icon className="w-6 h-6" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-brand-brown/30 uppercase tracking-widest mb-1">{stat.label}</p>
-                  <h3 className="text-2xl font-black text-brand-brown tracking-tight">{stat.value}</h3>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {/* Quick Stats Grid - Removed as requested */}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Laba Rugi Card */}
