@@ -24,6 +24,7 @@ export default function AdminReports() {
 
   // Tutup Buku States
   const [selectedClosingMonth, setSelectedClosingMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [closingMode, setClosingMode] = useState('bulanan'); // 'bulanan' or 'kumulatif'
 
   useEffect(() => {
     fetchInitialData();
@@ -119,44 +120,63 @@ export default function AdminReports() {
 
   // TUTUP BUKU CALCULATIONS
   const closingData = useMemo(() => {
+    // 1. Monthly Profit
     const monthSales = sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.tanggal.startsWith(selectedClosingMonth));
     const monthExpenses = expenses.filter(e => e.tanggal.startsWith(selectedClosingMonth));
     const monthIncomes = incomes.filter(i => i.tanggal.startsWith(selectedClosingMonth) && i.kategori !== 'Modal Awal');
 
-    const revenue = monthSales.reduce((sum, s) => sum + Number(s.total_penjualan), 0);
-    const cogs = monthSales.reduce((sum, s) => {
+    const mRevenue = monthSales.reduce((sum, s) => sum + Number(s.total_penjualan), 0);
+    const mCogs = monthSales.reduce((sum, s) => {
       const product = products.find(p => p.id === s.produk_id);
       return sum + ((product ? Number(product.harga_modal) : 0) * Number(s.jumlah));
     }, 0);
-    const opex = monthExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
-    const otherInc = monthIncomes.reduce((sum, i) => sum + Number(i.jumlah), 0);
-    
-    const netProfit = (revenue - cogs - opex + otherInc);
+    const mOpex = monthExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
+    const mOtherInc = monthIncomes.reduce((sum, i) => sum + Number(i.jumlah), 0);
+    const mNetProfit = (mRevenue - mCogs - mOpex + mOtherInc);
+
+    // 2. Cumulative Profit (Retained Earnings)
+    const cumulativeRevenue = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => sum + Number(s.total_penjualan), 0);
+    const cumulativeCogs = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => {
+      const product = products.find(p => p.id === s.produk_id);
+      return sum + ((product ? Number(product.harga_modal) : 0) * Number(s.jumlah));
+    }, 0);
+    const cumulativeOpex = expenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
+    const cumulativeOtherInc = incomes.filter(i => i.kategori !== 'Modal Awal').reduce((sum, i) => sum + Number(i.jumlah), 0);
+    const cumulativeNetProfit = (cumulativeRevenue - cumulativeCogs - cumulativeOpex + cumulativeOtherInc);
+
     const isAlreadyClosed = monthExpenses.some(e => e.kategori === 'Bagi Hasil Investor');
 
-    return { netProfit, isAlreadyClosed };
-  }, [selectedClosingMonth, sales, expenses, incomes, products]);
+    return { 
+      mNetProfit, 
+      cumulativeNetProfit, 
+      isAlreadyClosed,
+      finalProfit: closingMode === 'kumulatif' ? cumulativeNetProfit : mNetProfit
+    };
+  }, [selectedClosingMonth, sales, expenses, incomes, products, closingMode]);
 
   const handleTutupBuku = async () => {
     if (closingData.isAlreadyClosed) return toast.error('Bulan ini sudah pernah ditutup buku!');
-    if (closingData.netProfit <= 0) return toast.error('Laba bersih nol atau minus, tidak ada bagi hasil untuk dibagikan.');
-    if (!window.confirm(`Konfirmasi Tutup Buku ${selectedClosingMonth}?\nTotal Laba: ${formatRupiah(closingData.netProfit)}\nSistem akan mendistribusikan bagi hasil ke ${investors.length} investor.`)) return;
+    if (closingData.finalProfit <= 0) return toast.error('Laba bersih nol atau minus, tidak ada bagi hasil untuk dibagikan.');
+    
+    const profitText = closingMode === 'kumulatif' ? 'LABA KUMULATIF (Semua Waktu)' : `LABA BULANAN (${selectedClosingMonth})`;
+    
+    if (!window.confirm(`Konfirmasi Tutup Buku?\nMetode: ${profitText}\nTotal Laba Dibagikan: ${formatRupiah(closingData.finalProfit)}\nSistem akan mendistribusikan bagi hasil ke ${investors.length} investor.`)) return;
 
     try {
       setProcessing(true);
       const dividendRecords = investors.map(inv => ({
         tanggal: new Date().toISOString().split('T')[0],
         kategori: 'Bagi Hasil Investor',
-        nama_pengeluaran: `Bagi Hasil ${selectedClosingMonth}: ${inv.nama}`,
-        jumlah: (closingData.netProfit * (Number(inv.persentase) / 100)),
+        nama_pengeluaran: `Bagi Hasil (${closingMode === 'kumulatif' ? 'Kumulatif' : selectedClosingMonth}): ${inv.nama}`,
+        jumlah: (closingData.finalProfit * (Number(inv.persentase) / 100)),
         rekening_id: accounts.length > 0 ? accounts[0].id : null,
-        catatan: `Otomatis Tutup Buku Bulan ${selectedClosingMonth}. Persentase Saham: ${inv.persentase}%`
+        catatan: `Otomatis Tutup Buku ${selectedClosingMonth}. Mode: ${closingMode}. Saham: ${inv.persentase}%`
       }));
 
       const { error } = await supabase.from('kabung_expenses').insert(dividendRecords);
       if (error) throw error;
 
-      toast.success(`Tutup buku ${selectedClosingMonth} berhasil! Bagi hasil telah dicatat.`);
+      toast.success(`Tutup buku berhasil! Bagi hasil telah dicatat.`);
       await fetchInitialData();
     } catch (error) {
       toast.error('Gagal tutup buku: ' + error.message);
@@ -460,6 +480,25 @@ export default function AdminReports() {
                 />
               </div>
 
+              <div className="flex gap-4 mb-8">
+                <button 
+                  onClick={() => setClosingMode('bulanan')}
+                  className={`flex-1 p-4 rounded-2xl border transition-all text-left ${closingMode === 'bulanan' ? 'bg-brand-brown text-white border-brand-brown shadow-lg' : 'bg-white text-brand-brown/60 border-brand-brown/10 hover:border-brand-brown/30'}`}
+                >
+                  <p className="text-[9px] font-black uppercase tracking-widest opacity-60">Metode Tutup</p>
+                  <p className="font-bold">Hanya Bulan Ini</p>
+                  <p className="text-xs mt-1 font-black">{formatRupiah(closingData.mNetProfit)}</p>
+                </button>
+                <button 
+                  onClick={() => setClosingMode('kumulatif')}
+                  className={`flex-1 p-4 rounded-2xl border transition-all text-left ${closingMode === 'kumulatif' ? 'bg-brand-gold text-brand-brown border-brand-gold shadow-lg' : 'bg-white text-brand-brown/60 border-brand-brown/10 hover:border-brand-brown/30'}`}
+                >
+                  <p className="text-[9px] font-black uppercase tracking-widest opacity-60">Metode Tutup</p>
+                  <p className="font-bold">Akumulatif (Aman)</p>
+                  <p className="text-xs mt-1 font-black">{formatRupiah(closingData.cumulativeNetProfit)}</p>
+                </button>
+              </div>
+
               {closingData.isAlreadyClosed ? (
                 <div className="bg-emerald-50 border border-emerald-100 p-8 rounded-3xl flex items-center gap-6 mb-10">
                   <div className="w-16 h-16 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shrink-0">
@@ -470,23 +509,23 @@ export default function AdminReports() {
                     <p className="text-sm text-emerald-700/60 mt-1">Bagi hasil untuk investor telah didistribusikan ke dalam catatan pengeluaran.</p>
                   </div>
                 </div>
-              ) : closingData.netProfit <= 0 ? (
+              ) : closingData.finalProfit <= 0 ? (
                 <div className="bg-rose-50 border border-rose-100 p-8 rounded-3xl flex items-center gap-6 mb-10">
                   <div className="w-16 h-16 bg-rose-500 text-white rounded-2xl flex items-center justify-center shrink-0">
                     <AlertCircle className="w-10 h-10" />
                   </div>
                   <div>
                     <h4 className="text-lg font-black text-rose-900">Tidak Ada Laba Tersedia</h4>
-                    <p className="text-sm text-rose-700/60 mt-1">Hanya bulan dengan laba positif yang dapat melakukan proses tutup buku dan bagi hasil.</p>
+                    <p className="text-sm text-rose-700/60 mt-1">Laba bersih nol atau minus. Tidak dapat melakukan tutup buku.</p>
                   </div>
                 </div>
               ) : (
-                <div className="bg-brand-brown/5 p-8 rounded-3xl mb-10">
+                <div className={`${closingMode === 'kumulatif' ? 'bg-brand-gold/10' : 'bg-brand-brown/5'} p-8 rounded-3xl mb-10`}>
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-xs font-black text-brand-brown/40 uppercase tracking-widest">Laba Bersih Tersedia ({selectedClosingMonth})</span>
-                    <span className="text-2xl font-black text-brand-brown">{formatRupiah(closingData.netProfit)}</span>
+                    <span className="text-xs font-black text-brand-brown/40 uppercase tracking-widest">Laba Dibagikan ({closingMode === 'kumulatif' ? 'Kumulatif' : selectedClosingMonth})</span>
+                    <span className="text-2xl font-black text-brand-brown">{formatRupiah(closingData.finalProfit)}</span>
                   </div>
-                  <p className="text-[10px] text-brand-brown/30 font-bold uppercase tracking-widest italic">Profit ini akan dibagikan kepada seluruh investor sesuai porsi saham mereka.</p>
+                  <p className="text-[10px] text-brand-brown/30 font-bold uppercase tracking-widest italic">Bagi hasil otomatis dihitung berdasarkan porsi saham masing-masing investor.</p>
                 </div>
               )}
 
@@ -501,7 +540,7 @@ export default function AdminReports() {
                       </div>
                       <div className="text-right">
                         <p className="font-black text-brand-gold text-lg">
-                          {formatRupiah(closingData.netProfit > 0 ? (closingData.netProfit * (Number(inv.persentase) / 100)) : 0)}
+                          {formatRupiah(closingData.finalProfit > 0 ? (closingData.finalProfit * (Number(inv.persentase) / 100)) : 0)}
                         </p>
                         <p className="text-[10px] font-bold text-brand-brown/20 uppercase">Estimasi Transfer</p>
                       </div>
@@ -510,7 +549,7 @@ export default function AdminReports() {
                 </div>
               </div>
 
-              {!closingData.isAlreadyClosed && closingData.netProfit > 0 && (
+              {!closingData.isAlreadyClosed && closingData.finalProfit > 0 && (
                 <button 
                   onClick={handleTutupBuku}
                   disabled={processing}
@@ -525,12 +564,12 @@ export default function AdminReports() {
 
           <div className="lg:col-span-4 space-y-6">
             <div className="bg-brand-gold rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
-              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60 mb-4">Informasi</h4>
-              <p className="text-sm font-bold leading-relaxed mb-6">Proses Tutup Buku berfungsi untuk mencatat pembagian keuntungan bulanan sebagai pengeluaran resmi bisnis.</p>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60 mb-4">Tips</h4>
+              <p className="text-sm font-bold leading-relaxed mb-6">Jika ini adalah Tutup Buku pertama kali dan ada pengeluaran di bulan sebelumnya, pilih metode **Akumulatif** agar keuangan bisnis tetap sehat.</p>
               <ul className="space-y-3">
-                <li className="flex items-start gap-3 text-[10px] font-black uppercase tracking-widest"><ShieldCheck className="w-4 h-4 shrink-0" /> Otomatis Tercatat di Keuangan</li>
-                <li className="flex items-start gap-3 text-[10px] font-black uppercase tracking-widest"><ShieldCheck className="w-4 h-4 shrink-0" /> Saldo Kas Akan Berkurang</li>
-                <li className="flex items-start gap-3 text-[10px] font-black uppercase tracking-widest"><ShieldCheck className="w-4 h-4 shrink-0" /> Mencegah Distribusi Ganda</li>
+                <li className="flex items-start gap-3 text-[10px] font-black uppercase tracking-widest"><ShieldCheck className="w-4 h-4 shrink-0" /> Nutupi Biaya Bulan Lalu</li>
+                <li className="flex items-start gap-3 text-[10px] font-black uppercase tracking-widest"><ShieldCheck className="w-4 h-4 shrink-0" /> Dividen dari Laba Bersih Nyata</li>
+                <li className="flex items-start gap-3 text-[10px] font-black uppercase tracking-widest"><ShieldCheck className="w-4 h-4 shrink-0" /> Riwayat Akurat</li>
               </ul>
             </div>
           </div>
