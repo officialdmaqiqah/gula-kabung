@@ -82,10 +82,11 @@ export default function AdminReports() {
       if (filterPeriod === 'Hari ini') return item.tanggal === todayStr;
       if (filterPeriod === 'Minggu ini') return item.tanggal >= startOfWeekStr && item.tanggal <= todayStr;
       if (filterPeriod === 'Bulan ini') return item.tanggal >= startOfMonthStr && item.tanggal <= todayStr;
-      if (filterPeriod === 'Custom' && customStartDate && customEndDate) {
+      if (filterPeriod === 'Custom') {
+        if (!customStartDate || !customEndDate) return false;
         return item.tanggal >= customStartDate && item.tanggal <= customEndDate;
       }
-      return true;
+      return true; // Default for 'Semua'
     });
 
     return {
