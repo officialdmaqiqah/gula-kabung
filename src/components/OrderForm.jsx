@@ -118,6 +118,22 @@ export default function OrderForm() {
         const { error } = await supabase.from('kabung_sales').insert(salesEntries);
         if (error) throw error;
 
+        // Decrease stock for each item ordered
+        for (const item of cart) {
+          const { data: product, error: fetchError } = await supabase
+            .from('kabung_products')
+            .select('stok')
+            .eq('id', item.id)
+            .single();
+
+          if (!fetchError && product) {
+            await supabase
+              .from('kabung_products')
+              .update({ stok: Math.max(0, (product.stok || 0) - item.quantity) })
+              .eq('id', item.id);
+          }
+        }
+
         // Generate WhatsApp Message
         const orderItems = cart
           .map((item) => `- ${item.name} (${item.quantity}x) = ${formatRupiah(item.price * item.quantity)}`)
