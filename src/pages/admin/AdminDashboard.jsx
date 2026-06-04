@@ -205,6 +205,9 @@ export default function AdminDashboard() {
   }
 
   try {
+    const operationalBalances = (accountBalances || []).filter(acc => acc && acc.nama_rekening && !acc.nama_rekening.startsWith('Kantong'));
+    const kantongBalances = (accountBalances || []).filter(acc => acc && acc.nama_rekening && acc.nama_rekening.startsWith('Kantong'));
+
     return (
       <div className="space-y-6 pb-4">
         {/* Quick Stats Grid - Removed as requested */}
@@ -321,24 +324,66 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {accountBalances.map(acc => (
-                <div key={acc.id} className="p-6 bg-white border border-brand-brown/5 rounded-3xl hover:border-brand-gold/30 hover:shadow-lg transition-all duration-500 flex justify-between items-center group">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-brand-brown/5 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
-                      <Wallet className="w-6 h-6 text-brand-brown/20" />
+            {/* Section: Operational Accounts */}
+            <div className="mb-8">
+              <h3 className="text-xs font-black text-brand-brown/40 uppercase tracking-widest mb-4">Rekening Operasional</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {operationalBalances.map(acc => (
+                  <div key={acc.id} className="p-6 bg-white border border-brand-brown/5 rounded-3xl hover:border-brand-gold/30 hover:shadow-lg transition-all duration-500 flex justify-between items-center group">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-brand-brown/5 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                        <Wallet className="w-6 h-6 text-brand-brown/20" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-brand-brown/30 uppercase tracking-[0.2em] mb-1">{acc.nama_rekening}</p>
+                        <h4 className="text-lg font-black text-brand-brown tracking-tight">{formatRupiah(acc.currentBalance)}</h4>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-black text-brand-brown/30 uppercase tracking-[0.2em] mb-1">{acc.nama_rekening}</p>
-                      <h4 className="text-lg font-black text-brand-brown tracking-tight">{formatRupiah(acc.currentBalance)}</h4>
+                    <div className="p-2 bg-brand-brown/5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ArrowRightLeft className="w-4 h-4 text-brand-gold" />
                     </div>
                   </div>
-                  <div className="p-2 bg-brand-brown/5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                    <ArrowRightLeft className="w-4 h-4 text-brand-gold" />
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+
+            {/* Section: Pocket Funds */}
+            {kantongBalances.length > 0 && (
+              <div>
+                <h3 className="text-xs font-black text-brand-brown/40 uppercase tracking-widest mb-4">Kantong Dana (Alokasi Tutup Buku)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {kantongBalances.map(acc => {
+                    let accentBg = 'bg-brand-gold/5 border-brand-gold/10';
+                    let iconColor = 'text-brand-gold';
+                    
+                    if (acc.nama_rekening.includes('Sedekah')) {
+                      accentBg = 'bg-emerald-50 border-emerald-100';
+                      iconColor = 'text-emerald-600';
+                    } else if (acc.nama_rekening.includes('Ka\'bah') || acc.nama_rekening.includes('Kabah')) {
+                      accentBg = 'bg-rose-50 border-rose-100';
+                      iconColor = 'text-rose-600';
+                    }
+                    
+                    return (
+                      <div key={acc.id} className={`p-6 border rounded-3xl hover:shadow-lg transition-all duration-500 flex justify-between items-center group ${accentBg}`}>
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-sm">
+                            <Wallet className={`w-6 h-6 ${iconColor}`} />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-brand-brown/30 uppercase tracking-[0.2em] mb-1">{acc.nama_rekening}</p>
+                            <h4 className="text-lg font-black text-brand-brown tracking-tight">{formatRupiah(acc.currentBalance)}</h4>
+                          </div>
+                        </div>
+                        <div className="p-2 bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+                          <ArrowRightLeft className={`w-4 h-4 ${iconColor}`} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Low Stock Warning */}

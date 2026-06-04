@@ -175,7 +175,9 @@ export default function AdminSettings() {
         await supabase.from('kabung_investors').delete().eq('id', id);
       } else if (activeTab === 'account') {
         const acc = accounts.find(a => a.id === id);
-        if (acc?.nama_rekening === 'Kas Tunai') return alert('Kas Tunai tidak bisa dihapus.');
+        if (acc?.nama_rekening === 'Kas Tunai' || acc?.nama_rekening?.startsWith('Kantong')) {
+          return alert(`${acc.nama_rekening} tidak bisa dihapus.`);
+        }
         await supabase.from('kabung_accounts').delete().eq('id', id);
       } else if (activeTab === 'supplier') {
         await supabase.from('kabung_suppliers').delete().eq('id', id);
@@ -391,7 +393,7 @@ export default function AdminSettings() {
                   </td>
                   <td className="px-6 py-4 flex justify-end gap-2">
                     <button onClick={() => handleOpenModal(acc)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit className="w-4 h-4" /></button>
-                    {acc.nama_rekening !== 'Kas Tunai' && <button onClick={() => handleDelete(acc.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>}
+                    {acc.nama_rekening !== 'Kas Tunai' && !acc.nama_rekening.startsWith('Kantong') && <button onClick={() => handleDelete(acc.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>}
                   </td>
                 </tr>
               ))}

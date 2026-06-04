@@ -341,7 +341,7 @@ export default function AdminPurchases() {
                   <label className="block text-[10px] font-black uppercase tracking-widest text-brand-brown/50 mb-2">Rekening Pembayar *</label>
                   <select required value={formData.rekeningId} onChange={e => setFormData({...formData, rekeningId: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-brand-brown/10 focus:border-brand-gold outline-none font-bold">
                     <option value="">-- Pilih Rekening --</option>
-                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.nama_rekening}</option>)}
+                    {accounts.filter(acc => acc && acc.nama_rekening && !acc.nama_rekening.startsWith('Kantong')).map(acc => <option key={acc.id} value={acc.id}>{acc.nama_rekening}</option>)}
                   </select>
                 </div>
 

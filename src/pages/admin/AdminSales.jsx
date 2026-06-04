@@ -340,7 +340,7 @@ export default function AdminSales() {
                   <label className="block text-sm font-medium mb-1">Uang Masuk ke Rekening *</label>
                   <select required value={formData.rekeningId} onChange={e => setFormData({...formData, rekeningId: e.target.value})} className="w-full px-3 py-2 border rounded-xl">
                     <option value="">-- Pilih Rekening --</option>
-                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.nama_rekening}</option>)}
+                    {accounts.filter(acc => acc && acc.nama_rekening && !acc.nama_rekening.startsWith('Kantong')).map(acc => <option key={acc.id} value={acc.id}>{acc.nama_rekening}</option>)}
                   </select>
                 </div>
                 <div>

@@ -167,6 +167,30 @@ export default function AdminReports() {
       
       const accountId = accounts.length > 0 ? accounts[0].id : null;
 
+      // 1. Ensure virtual accounts exist and get their IDs
+      const virtualNames = ['Kantong Investasi', 'Kantong Sedekah', 'Kantong Ka\'bah'];
+      const virtualIds = {};
+      for (const name of virtualNames) {
+        const found = accounts.find(a => a.nama_rekening === name);
+        if (found) {
+          virtualIds[name] = found.id;
+        } else {
+          // If not in state, try querying just in case
+          const { data: existing } = await supabase.from('kabung_accounts').select('id').eq('nama_rekening', name).maybeSingle();
+          if (existing) {
+            virtualIds[name] = existing.id;
+          } else {
+            const { data: created, error: createErr } = await supabase
+              .from('kabung_accounts')
+              .insert([{ nama_rekening: name, saldo_awal: 0 }])
+              .select().single();
+            if (createErr) throw createErr;
+            virtualIds[name] = created.id;
+          }
+        }
+      }
+
+      // 2. Prepare expense records (Deduct from main source account)
       const records = [
         { tanggal: targetDate, kategori: 'Alokasi Investasi', nama_pengeluaran: `Dana Investasi (${selectedClosingMonth})`, jumlah: closingData.alokasiInvestasi, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (40%)' },
         { tanggal: targetDate, kategori: 'Alokasi Sedekah', nama_pengeluaran: `Dana Sedekah (${selectedClosingMonth})`, jumlah: closingData.alokasiSedekah, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (10%)' },
@@ -182,10 +206,21 @@ export default function AdminReports() {
         catatan: `Tutup Buku ${selectedClosingMonth}. Porsi 40% dari total laba.`
       }));
 
-      const { error } = await supabase.from('kabung_expenses').insert([...records, ...dividendRecords]);
-      if (error) throw error;
+      // 3. Prepare income records (Deposit into virtual pocket accounts)
+      const incomeRecords = [
+        { tanggal: targetDate, kategori: 'Alokasi Investasi', nama_pemasukan: `Setoran Alokasi Investasi (${selectedClosingMonth})`, jumlah: closingData.alokasiInvestasi, rekening_id: virtualIds['Kantong Investasi'], catatan: 'Otomatis Tutup Buku (40%)' },
+        { tanggal: targetDate, kategori: 'Alokasi Sedekah', nama_pemasukan: `Setoran Alokasi Sedekah (${selectedClosingMonth})`, jumlah: closingData.alokasiSedekah, rekening_id: virtualIds['Kantong Sedekah'], catatan: 'Otomatis Tutup Buku (10%)' },
+        { tanggal: targetDate, kategori: 'Ka\'bah', nama_pemasukan: `Setoran Alokasi Ka'bah (${selectedClosingMonth})`, jumlah: closingData.alokasiSelfDev, rekening_id: virtualIds['Kantong Ka\'bah'], catatan: 'Otomatis Tutup Buku (10%)' },
+      ];
 
-      toast.success(`Tutup buku berhasil! Seluruh alokasi telah dicatat.`);
+      // Execute all inserts
+      const { error: expError } = await supabase.from('kabung_expenses').insert([...records, ...dividendRecords]);
+      if (expError) throw expError;
+
+      const { error: incError } = await supabase.from('kabung_incomes').insert(incomeRecords);
+      if (incError) throw incError;
+
+      toast.success(`Tutup buku berhasil! Seluruh alokasi telah dicatat ke Kantong Dana.`);
       await fetchInitialData();
     } catch (error) {
       toast.error('Gagal tutup buku: ' + error.message);
