@@ -160,17 +160,21 @@ export default function AdminReports() {
 
     try {
       setProcessing(true);
-      const today = new Date().toISOString().split('T')[0];
+      // Get the last day of the selected closing month
+      const [year, month] = selectedClosingMonth.split('-').map(Number);
+      const lastDay = new Date(year, month, 0).getDate();
+      const targetDate = `${selectedClosingMonth}-${String(lastDay).padStart(2, '0')}`;
+      
       const accountId = accounts.length > 0 ? accounts[0].id : null;
 
       const records = [
-        { tanggal: today, kategori: 'Alokasi Investasi', nama_pengeluaran: `Dana Investasi (${selectedClosingMonth})`, jumlah: closingData.alokasiInvestasi, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (40%)' },
-        { tanggal: today, kategori: 'Alokasi Sedekah', nama_pengeluaran: `Dana Sedekah (${selectedClosingMonth})`, jumlah: closingData.alokasiSedekah, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (10%)' },
-        { tanggal: today, kategori: 'Ka\'bah', nama_pengeluaran: `Dana Ka'bah (${selectedClosingMonth})`, jumlah: closingData.alokasiSelfDev, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (10%)' },
+        { tanggal: targetDate, kategori: 'Alokasi Investasi', nama_pengeluaran: `Dana Investasi (${selectedClosingMonth})`, jumlah: closingData.alokasiInvestasi, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (40%)' },
+        { tanggal: targetDate, kategori: 'Alokasi Sedekah', nama_pengeluaran: `Dana Sedekah (${selectedClosingMonth})`, jumlah: closingData.alokasiSedekah, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (10%)' },
+        { tanggal: targetDate, kategori: 'Ka\'bah', nama_pengeluaran: `Dana Ka'bah (${selectedClosingMonth})`, jumlah: closingData.alokasiSelfDev, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (10%)' },
       ];
 
       const dividendRecords = investors.map(inv => ({
-        tanggal: today,
+        tanggal: targetDate,
         kategori: 'Bagi Hasil Investor',
         nama_pengeluaran: `Bagi Hasil ${selectedClosingMonth}: ${inv.nama}`,
         jumlah: (closingData.alokasiDividen * (Number(inv.persentase) / 100)),
