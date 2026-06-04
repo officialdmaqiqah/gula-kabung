@@ -155,6 +155,33 @@ export default function AdminReports() {
   const handleTutupBuku = async () => {
     if (closingData.isAlreadyClosed) return toast.error('Bulan ini sudah pernah ditutup buku!');
     if (closingData.finalProfit <= 0) return toast.error('Laba bersih nol atau minus.');
+
+    const accountId = accounts.length > 0 ? accounts[0].id : null;
+    if (!accountId) return toast.error('Tidak ada rekening terdaftar untuk melakukan tutup buku.');
+
+    // Calculate source account balance
+    const getAccountBalance = (id) => {
+      const acc = accounts.find(a => a.id === id);
+      if (!acc) return 0;
+      let balance = Number(acc.saldo_awal) || 0;
+      sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.rekening_id === id).forEach(s => balance += Number(s.total_penjualan));
+      incomes.filter(i => i.rekening_id === id).forEach(i => balance += Number(i.jumlah));
+      purchases.filter(p => p.rekening_id === id).forEach(p => balance -= Number(p.harga_beli_total));
+      expenses.filter(e => e.rekening_id === id).forEach(e => balance -= Number(e.jumlah));
+      mutations.filter(m => m.dari_rekening_id === id).forEach(m => balance -= Number(m.jumlah));
+      mutations.filter(m => m.ke_rekening_id === id).forEach(m => balance += Number(m.jumlah));
+      return balance;
+    };
+
+    const sourceAccount = accounts.find(a => a.id === accountId);
+    const sourceBalance = getAccountBalance(accountId);
+    const totalRequired = closingData.finalProfit;
+
+    if (sourceBalance < totalRequired) {
+      if (!window.confirm(`Peringatan: Saldo rekening "${sourceAccount?.nama_rekening}" (${formatRupiah(sourceBalance)}) tidak mencukupi untuk total alokasi Tutup Buku sebesar ${formatRupiah(totalRequired)}.\n\nSaldo rekening ini akan bernilai negatif setelah proses ini.\n\nApakah Anda yakin ingin tetap melanjutkan?`)) {
+        return;
+      }
+    }
     
     if (!window.confirm(`Konfirmasi Tutup Buku?\nTotal Laba: ${formatRupiah(closingData.finalProfit)}\n\nDistribusi:\n- Investasi (40%): ${formatRupiah(closingData.alokasiInvestasi)}\n- Sedekah (10%): ${formatRupiah(closingData.alokasiSedekah)}\n- Ka'bah (10%): ${formatRupiah(closingData.alokasiSelfDev)}\n- Bagi Hasil (40%): ${formatRupiah(closingData.alokasiDividen)}`)) return;
 
@@ -164,8 +191,6 @@ export default function AdminReports() {
       const [year, month] = selectedClosingMonth.split('-').map(Number);
       const lastDay = new Date(year, month, 0).getDate();
       const targetDate = `${selectedClosingMonth}-${String(lastDay).padStart(2, '0')}`;
-      
-      const accountId = accounts.length > 0 ? accounts[0].id : null;
 
       // 1. Ensure virtual accounts exist and get their IDs
       const virtualNames = ['Kantong Investasi', 'Kantong Sedekah', 'Kantong Ka\'bah'];
