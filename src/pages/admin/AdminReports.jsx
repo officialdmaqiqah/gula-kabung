@@ -156,7 +156,7 @@ export default function AdminReports() {
     if (closingData.isAlreadyClosed) return toast.error('Bulan ini sudah pernah ditutup buku!');
     if (closingData.finalProfit <= 0) return toast.error('Laba bersih nol atau minus.');
     
-    if (!window.confirm(`Konfirmasi Tutup Buku?\nTotal Laba: ${formatRupiah(closingData.finalProfit)}\n\nDistribusi:\n- Investasi (40%): ${formatRupiah(closingData.alokasiInvestasi)}\n- Sedekah (10%): ${formatRupiah(closingData.alokasiSedekah)}\n- Self Dev (10%): ${formatRupiah(closingData.alokasiSelfDev)}\n- Bagi Hasil (40%): ${formatRupiah(closingData.alokasiDividen)}`)) return;
+    if (!window.confirm(`Konfirmasi Tutup Buku?\nTotal Laba: ${formatRupiah(closingData.finalProfit)}\n\nDistribusi:\n- Investasi (40%): ${formatRupiah(closingData.alokasiInvestasi)}\n- Sedekah (10%): ${formatRupiah(closingData.alokasiSedekah)}\n- Ka'bah (10%): ${formatRupiah(closingData.alokasiSelfDev)}\n- Bagi Hasil (40%): ${formatRupiah(closingData.alokasiDividen)}`)) return;
 
     try {
       setProcessing(true);
@@ -166,7 +166,7 @@ export default function AdminReports() {
       const records = [
         { tanggal: today, kategori: 'Alokasi Investasi', nama_pengeluaran: `Dana Investasi (${selectedClosingMonth})`, jumlah: closingData.alokasiInvestasi, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (40%)' },
         { tanggal: today, kategori: 'Alokasi Sedekah', nama_pengeluaran: `Dana Sedekah (${selectedClosingMonth})`, jumlah: closingData.alokasiSedekah, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (10%)' },
-        { tanggal: today, kategori: 'Pengembangan Diri', nama_pengeluaran: `Dana Self-Dev (${selectedClosingMonth})`, jumlah: closingData.alokasiSelfDev, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (10%)' },
+        { tanggal: today, kategori: 'Ka\'bah', nama_pengeluaran: `Dana Ka'bah (${selectedClosingMonth})`, jumlah: closingData.alokasiSelfDev, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (10%)' },
       ];
 
       const dividendRecords = investors.map(inv => ({
@@ -340,7 +340,7 @@ export default function AdminReports() {
                       <Heart className="w-5 h-5 mx-auto text-emerald-600 mb-2" /><p className="text-[8px] font-black uppercase text-emerald-600/40">Sedekah (10%)</p><p className="text-[10px] font-black text-emerald-600 mt-1">{formatRupiah(closingData.alokasiSedekah)}</p>
                     </div>
                     <div className="p-4 bg-rose-50 border border-rose-100 rounded-3xl text-center">
-                      <Zap className="w-5 h-5 mx-auto text-rose-600 mb-2" /><p className="text-[8px] font-black uppercase text-rose-600/40">Self-Dev (10%)</p><p className="text-[10px] font-black text-rose-600 mt-1">{formatRupiah(closingData.alokasiSelfDev)}</p>
+                      <Zap className="w-5 h-5 mx-auto text-rose-600 mb-2" /><p className="text-[8px] font-black uppercase text-rose-600/40">Ka'bah (10%)</p><p className="text-[10px] font-black text-rose-600 mt-1">{formatRupiah(closingData.alokasiSelfDev)}</p>
                     </div>
                     <div className="p-4 bg-brand-gold/10 border border-brand-gold/20 rounded-3xl text-center">
                       <ShieldCheck className="w-5 h-5 mx-auto text-brand-gold mb-2" /><p className="text-[8px] font-black uppercase text-brand-gold/60">Bagi Hasil (40%)</p><p className="text-[10px] font-black text-brand-brown mt-1">{formatRupiah(closingData.alokasiDividen)}</p>
