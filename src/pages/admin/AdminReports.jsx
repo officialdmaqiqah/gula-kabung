@@ -150,7 +150,7 @@ export default function AdminReports() {
     return { revenue, cogs, grossProfit: revenue - cogs, opex, otherIncome: otherInc, netProfit };
   }, [filteredSales, filteredExpenses, products, filteredIncomes]);
 
-  // TUTUP BUKU CALCULATIONS (With 40-10-10-40 Rule)
+  // TUTUP BUKU CALCULATIONS (With 40-10-10-40 Rule and Rounding Adjustment)
   const closingData = useMemo(() => {
     const monthSales = sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.tanggal.startsWith(selectedClosingMonth));
     const monthExpenses = expenses.filter(e => e.tanggal.startsWith(selectedClosingMonth));
@@ -177,17 +177,37 @@ export default function AdminReports() {
     const isAlreadyClosed = monthExpenses.some(e => e.kategori === 'Bagi Hasil Investor');
     const finalProfit = closingMode === 'kumulatif' ? cumulativeNetProfit : mNetProfit;
 
-    // Split buckets
-    const alokasiInvestasi = finalProfit * 0.40;
-    const alokasiSedekah = finalProfit * 0.10;
-    const alokasiSelfDev = finalProfit * 0.10;
-    const alokasiDividen = finalProfit * 0.40;
+    // Split buckets using whole Rupiah rounding
+    const alokasiSedekah = Math.round(finalProfit * 0.10);
+    const alokasiSelfDev = Math.round(finalProfit * 0.10);
+    const alokasiDividen = Math.round(finalProfit * 0.40);
+    // Investasi acts as the balancer to absorb any rounding differences
+    const alokasiInvestasi = finalProfit - alokasiSedekah - alokasiSelfDev - alokasiDividen;
+
+    // Calculate rounded individual investor dividends
+    let allocatedDividends = 0;
+    const roundedInvestorDividends = investors.map((inv, index) => {
+      let amount = 0;
+      if (index === investors.length - 1) {
+        amount = alokasiDividen - allocatedDividends;
+      } else {
+        amount = Math.round(alokasiDividen * (Number(inv.persentase) / 100));
+        allocatedDividends += amount;
+      }
+      return {
+        id: inv.id,
+        nama: inv.nama,
+        persentase: inv.persentase,
+        jumlah: amount
+      };
+    });
 
     return { 
       mNetProfit, cumulativeNetProfit, isAlreadyClosed, finalProfit,
-      alokasiInvestasi, alokasiSedekah, alokasiSelfDev, alokasiDividen
+      alokasiInvestasi, alokasiSedekah, alokasiSelfDev, alokasiDividen,
+      roundedInvestorDividends
     };
-  }, [selectedClosingMonth, sales, expenses, incomes, products, closingMode]);
+  }, [selectedClosingMonth, sales, expenses, incomes, products, closingMode, investors]);
 
   const handleTutupBuku = async () => {
     if (closingData.isAlreadyClosed) return toast.error('Bulan ini sudah pernah ditutup buku!');
@@ -233,11 +253,11 @@ export default function AdminReports() {
         { tanggal: targetDate, kategori: 'Ka\'bah', nama_pengeluaran: `Dana Ka'bah (${selectedClosingMonth})`, jumlah: closingData.alokasiSelfDev, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (10%)' },
       ];
 
-      const dividendRecords = investors.map(inv => ({
+      const dividendRecords = closingData.roundedInvestorDividends.map(invDiv => ({
         tanggal: targetDate,
         kategori: 'Bagi Hasil Investor',
-        nama_pengeluaran: `Bagi Hasil ${selectedClosingMonth}: ${inv.nama}`,
-        jumlah: (closingData.alokasiDividen * (Number(inv.persentase) / 100)),
+        nama_pengeluaran: `Bagi Hasil ${selectedClosingMonth}: ${invDiv.nama}`,
+        jumlah: invDiv.jumlah,
         rekening_id: accountId,
         catatan: `Tutup Buku ${selectedClosingMonth}. Porsi 40% dari total laba.`
       }));
@@ -427,10 +447,10 @@ export default function AdminReports() {
                   <div className="space-y-4">
                     <h4 className="text-[10px] font-black text-brand-brown/40 uppercase tracking-widest">Distribusi Bagi Hasil (40% Pool)</h4>
                     <div className="bg-brand-brown/[0.02] border border-brand-brown/5 rounded-[2rem] overflow-hidden divide-y divide-brand-brown/5">
-                      {investors.map(inv => (
+                      {closingData.roundedInvestorDividends.map(inv => (
                         <div key={inv.id} className="p-6 flex justify-between items-center group hover:bg-white transition-colors">
                           <div><p className="font-black text-brand-brown">{inv.nama}</p><p className="text-[9px] font-bold text-brand-brown/30 uppercase tracking-widest mt-1">Saham: {inv.persentase}%</p></div>
-                          <div className="text-right"><p className="font-black text-brand-gold text-lg">{formatRupiah(closingData.alokasiDividen * (Number(inv.persentase) / 100))}</p><p className="text-[9px] font-bold text-brand-brown/20 uppercase">Porsi Bagi Hasil</p></div>
+                          <div className="text-right"><p className="font-black text-brand-gold text-lg">{formatRupiah(inv.jumlah)}</p><p className="text-[9px] font-bold text-brand-brown/20 uppercase">Porsi Bagi Hasil</p></div>
                         </div>
                       ))}
                     </div>
@@ -531,6 +551,15 @@ export default function AdminReports() {
                   <div className="flex justify-between items-center text-xs pt-3 border-t border-brand-brown/5">
                     <span className="font-bold text-brand-brown/60">Bagi Hasil Investor (40%)</span>
                     <span className="font-black text-brand-gold">{formatRupiah(closingData.alokasiDividen)}</span>
+                  </div>
+                  {/* Detailed Investor breakdown in confirmation modal */}
+                  <div className="pl-4 border-l border-brand-brown/10 space-y-2 pt-1">
+                    {closingData.roundedInvestorDividends.map(inv => (
+                      <div key={inv.id} className="flex justify-between items-center text-[11px]">
+                        <span className="text-brand-brown/60">{inv.nama} ({inv.persentase}%)</span>
+                        <span className="font-bold text-brand-brown/80">{formatRupiah(inv.jumlah)}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
