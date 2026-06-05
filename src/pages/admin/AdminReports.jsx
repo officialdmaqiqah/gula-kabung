@@ -25,6 +25,8 @@ export default function AdminReports() {
   // Tutup Buku States
   const [selectedClosingMonth, setSelectedClosingMonth] = useState(new Date().toISOString().substring(0, 7));
   const [closingMode, setClosingMode] = useState('bulanan'); 
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [selectedSourceAccountId, setSelectedSourceAccountId] = useState(''); 
 
   useEffect(() => {
     fetchInitialData();
@@ -59,6 +61,10 @@ export default function AdminReports() {
       setIncomes(iData || []);
       setProducts(prodData || []);
       setAccounts(accData || []);
+      if (accData && accData.length > 0) {
+        const firstOp = accData.find(a => !a.nama_rekening.startsWith('Kantong'));
+        setSelectedSourceAccountId(firstOp ? firstOp.id : accData[0].id);
+      }
       setInvestors(invData || []);
       setMutations(mutData || []);
     } catch (error) {
@@ -99,6 +105,37 @@ export default function AdminReports() {
       filteredIncomes: filter(incomes)
     };
   }, [sales, expenses, purchases, incomes, filterPeriod, filterMonth, customStartDate, customEndDate]);
+
+  // ACCOUNT BALANCES CALCULATION
+  const accountBalances = useMemo(() => {
+    const balances = {};
+    accounts.forEach(acc => {
+      balances[acc.id] = Number(acc.saldo_awal) || 0;
+    });
+
+    sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.rekening_id).forEach(s => {
+      if (balances[s.rekening_id] !== undefined) balances[s.rekening_id] += Number(s.total_penjualan);
+    });
+
+    incomes.filter(i => i.rekening_id).forEach(i => {
+      if (balances[i.rekening_id] !== undefined) balances[i.rekening_id] += Number(i.jumlah);
+    });
+
+    purchases.filter(p => p.rekening_id).forEach(p => {
+      if (balances[p.rekening_id] !== undefined) balances[p.rekening_id] -= Number(p.harga_beli_total);
+    });
+
+    expenses.filter(e => e.rekening_id).forEach(e => {
+      if (balances[e.rekening_id] !== undefined) balances[e.rekening_id] -= Number(e.jumlah);
+    });
+
+    mutations.forEach(m => {
+      if (m.dari_rekening_id && balances[m.dari_rekening_id] !== undefined) balances[m.dari_rekening_id] -= Number(m.jumlah);
+      if (m.ke_rekening_id && balances[m.ke_rekening_id] !== undefined) balances[m.ke_rekening_id] += Number(m.jumlah);
+    });
+
+    return balances;
+  }, [accounts, sales, incomes, purchases, expenses, mutations]);
 
   // LABA RUGI CALCULATIONS
   const pnl = useMemo(() => {
@@ -156,34 +193,8 @@ export default function AdminReports() {
     if (closingData.isAlreadyClosed) return toast.error('Bulan ini sudah pernah ditutup buku!');
     if (closingData.finalProfit <= 0) return toast.error('Laba bersih nol atau minus.');
 
-    const accountId = accounts.length > 0 ? accounts[0].id : null;
-    if (!accountId) return toast.error('Tidak ada rekening terdaftar untuk melakukan tutup buku.');
-
-    // Calculate source account balance
-    const getAccountBalance = (id) => {
-      const acc = accounts.find(a => a.id === id);
-      if (!acc) return 0;
-      let balance = Number(acc.saldo_awal) || 0;
-      sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.rekening_id === id).forEach(s => balance += Number(s.total_penjualan));
-      incomes.filter(i => i.rekening_id === id).forEach(i => balance += Number(i.jumlah));
-      purchases.filter(p => p.rekening_id === id).forEach(p => balance -= Number(p.harga_beli_total));
-      expenses.filter(e => e.rekening_id === id).forEach(e => balance -= Number(e.jumlah));
-      mutations.filter(m => m.dari_rekening_id === id).forEach(m => balance -= Number(m.jumlah));
-      mutations.filter(m => m.ke_rekening_id === id).forEach(m => balance += Number(m.jumlah));
-      return balance;
-    };
-
-    const sourceAccount = accounts.find(a => a.id === accountId);
-    const sourceBalance = getAccountBalance(accountId);
-    const totalRequired = closingData.finalProfit;
-
-    if (sourceBalance < totalRequired) {
-      if (!window.confirm(`Peringatan: Saldo rekening "${sourceAccount?.nama_rekening}" (${formatRupiah(sourceBalance)}) tidak mencukupi untuk total alokasi Tutup Buku sebesar ${formatRupiah(totalRequired)}.\n\nSaldo rekening ini akan bernilai negatif setelah proses ini.\n\nApakah Anda yakin ingin tetap melanjutkan?`)) {
-        return;
-      }
-    }
-    
-    if (!window.confirm(`Konfirmasi Tutup Buku?\nTotal Laba: ${formatRupiah(closingData.finalProfit)}\n\nDistribusi:\n- Investasi (40%): ${formatRupiah(closingData.alokasiInvestasi)}\n- Sedekah (10%): ${formatRupiah(closingData.alokasiSedekah)}\n- Ka'bah (10%): ${formatRupiah(closingData.alokasiSelfDev)}\n- Bagi Hasil (40%): ${formatRupiah(closingData.alokasiDividen)}`)) return;
+    const accountId = selectedSourceAccountId;
+    if (!accountId) return toast.error('Pilih rekening sumber untuk memotong dana.');
 
     try {
       setProcessing(true);
@@ -246,6 +257,7 @@ export default function AdminReports() {
       if (incError) throw incError;
 
       toast.success(`Tutup buku berhasil! Seluruh alokasi telah dicatat ke Kantong Dana.`);
+      setIsConfirmModalOpen(false);
       await fetchInitialData();
     } catch (error) {
       toast.error('Gagal tutup buku: ' + error.message);
@@ -424,15 +436,126 @@ export default function AdminReports() {
                     </div>
                   </div>
 
-                  <button onClick={handleTutupBuku} disabled={processing} className="w-full py-6 bg-brand-brown text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-brand-gold hover:text-brand-brown transition-all flex items-center justify-center gap-4 disabled:opacity-50">
-                    {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />} Proses Tutup Buku & Alokasi Dana
+                  <button onClick={() => setIsConfirmModalOpen(true)} disabled={processing} className="w-full py-6 bg-brand-brown text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-brand-gold hover:text-brand-brown transition-all flex items-center justify-center gap-4 disabled:opacity-50">
+                    <Lock className="w-5 h-5" /> Proses Tutup Buku & Alokasi Dana
                   </button>
                 </div>
               )}
-
+ 
               {closingData.isAlreadyClosed && (
                 <div className="bg-emerald-50 border border-emerald-100 p-10 rounded-[2.5rem] flex items-center gap-8"><CheckCircle2 className="w-16 h-16 text-emerald-500 shrink-0" /><div><h4 className="text-xl font-black text-emerald-900">Bulan Ini Sudah Ditutup</h4><p className="text-sm text-emerald-700/60 mt-1">Seluruh alokasi dana (40-10-10-40) telah dicatat ke pengeluaran.</p></div></div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI TUTUP BUKU */}
+      {isConfirmModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-auto p-4 md:p-8 flex items-center justify-center">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden animate-fade-up relative">
+            
+            {/* Header */}
+            <div className="p-8 border-b border-brand-brown/5 bg-brand-brown text-white relative">
+              <div className="absolute top-0 right-0 p-8 opacity-10">
+                <Lock className="w-24 h-24" />
+              </div>
+              <h3 className="text-xl font-black tracking-tight mb-1 uppercase italic">Konfirmasi Tutup Buku</h3>
+              <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Periode: {selectedClosingMonth} ({closingMode})</p>
+            </div>
+
+            {/* Content */}
+            <div className="p-8 space-y-6">
+              
+              {/* Dropdown Akun Sumber */}
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-brand-brown/50 mb-2">Pilih Rekening Sumber Dana *</label>
+                <select 
+                  value={selectedSourceAccountId} 
+                  onChange={e => setSelectedSourceAccountId(e.target.value)} 
+                  className="w-full px-4 py-3 bg-brand-brown/5 border border-brand-brown/10 rounded-2xl outline-none font-bold text-sm text-brand-brown"
+                >
+                  <option value="">-- Pilih Rekening --</option>
+                  {accounts
+                    .filter(acc => !acc.nama_rekening.startsWith('Kantong'))
+                    .map(acc => {
+                      const balance = accountBalances[acc.id] || 0;
+                      return (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.nama_rekening} (Saldo: {formatRupiah(balance)})
+                        </option>
+                      );
+                    })}
+                </select>
+              </div>
+
+              {/* Warning Banner if insufficient balance */}
+              {(() => {
+                const currentBalance = accountBalances[selectedSourceAccountId] || 0;
+                const totalRequired = closingData.finalProfit;
+                const isInsufficient = selectedSourceAccountId && currentBalance < totalRequired;
+                
+                if (isInsufficient) {
+                  return (
+                    <div className="p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                      <div className="text-xs">
+                        <p className="font-black">Peringatan: Saldo Tidak Mencukupi!</p>
+                        <p className="mt-1 opacity-80">
+                          Saldo rekening saat ini adalah **{formatRupiah(currentBalance)}**, sedangkan total alokasi yang dibutuhkan adalah **{formatRupiah(totalRequired)}**. 
+                          Saldo rekening ini akan bernilai **negatif** setelah proses ini.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Rincian Alokasi */}
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black text-brand-brown/40 uppercase tracking-widest">Rincian Pembagian Dana (Laba: {formatRupiah(closingData.finalProfit)})</h4>
+                <div className="bg-brand-brown/[0.02] border border-brand-brown/5 rounded-2xl p-6 space-y-4">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-brand-brown/60">Investasi (40%)</span>
+                    <span className="font-black text-brand-brown">{formatRupiah(closingData.alokasiInvestasi)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-brand-brown/60">Sedekah (10%)</span>
+                    <span className="font-black text-emerald-600">{formatRupiah(closingData.alokasiSedekah)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-brand-brown/60">Ka'bah (10%)</span>
+                    <span className="font-black text-rose-600">{formatRupiah(closingData.alokasiSelfDev)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs pt-3 border-t border-brand-brown/5">
+                    <span className="font-bold text-brand-brown/60">Bagi Hasil Investor (40%)</span>
+                    <span className="font-black text-brand-gold">{formatRupiah(closingData.alokasiDividen)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-4 pt-4 border-t border-brand-brown/5">
+                <button 
+                  type="button" 
+                  onClick={() => setIsConfirmModalOpen(false)} 
+                  className="flex-1 py-4 bg-brand-brown/5 text-brand-brown rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                  disabled={processing}
+                >
+                  Batal
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleTutupBuku} 
+                  disabled={processing || !selectedSourceAccountId}
+                  className="flex-[2] py-4 bg-brand-brown text-white hover:bg-brand-gold hover:text-brand-brown rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-brand-brown/10 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Konfirmasi & Proses
+                </button>
+              </div>
+
             </div>
           </div>
         </div>
