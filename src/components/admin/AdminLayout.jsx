@@ -14,7 +14,8 @@ import {
   Settings,
   User,
   Truck,
-  ArrowRightLeft
+  ArrowRightLeft,
+  ClipboardList
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -38,6 +39,7 @@ export default function AdminLayout() {
     { name: 'Pembelian Stok', path: '/admin/purchases', icon: Receipt },
     { name: 'Penerimaan Barang', path: '/admin/receiving', icon: Truck },
     { name: 'Penjualan', path: '/admin/sales', icon: ShoppingCart },
+    { name: 'Waiting List', path: '/admin/preorders', icon: ClipboardList },
     { name: 'Pencatatan Keuangan', path: '/admin/finances', icon: Wallet },
     { name: 'Mutasi Uang', path: '/admin/mutations', icon: ArrowRightLeft },
     { name: 'Laporan Laba Rugi', path: '/admin/reports', icon: BarChart3 },

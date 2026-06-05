@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Leaf, Search, Filter, ShoppingBag, ArrowRight, Grid, List, Loader2 } from 'lucide-react';
+import { Leaf, Search, Filter, ShoppingBag, ArrowRight, Grid, List, Loader2, Clock, ClipboardList, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatRupiah } from '../utils/format';
 import { useCart } from '../context/CartContext';
+import { toast } from 'react-hot-toast';
 
 export default function CatalogPage() {
   const [products, setProducts] = useState([]);
@@ -13,10 +14,31 @@ export default function CatalogPage() {
   const [activeCategory, setActiveCategory] = useState('Semua');
   
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  const [whatsapp, setWhatsapp] = useState('6281234567890');
+  const [preorderProduct, setPreorderProduct] = useState(null);
+  const [preorderFormData, setPreorderFormData] = useState({
+    namaKonsumen: '',
+    whatsapp: '',
+    jumlah: 1,
+    catatan: ''
+  });
+  const [preorderSubmitting, setPreorderSubmitting] = useState(false);
+  const [preorderSuccess, setPreorderSuccess] = useState(false);
   
   useEffect(() => {
     fetchProducts();
+    fetchSettings();
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const { data } = await supabase.from('kabung_settings').select('whatsapp').eq('id', 'main').single();
+      if (data && data.whatsapp) setWhatsapp(data.whatsapp);
+    } catch (err) {
+      console.error('Error fetching settings:', err);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -41,7 +63,7 @@ export default function CatalogPage() {
         name: p.nama_produk,
         price: p.harga_jual,
         formattedPrice: formatRupiah(p.harga_jual),
-        label: p.stok <= 0 ? 'Habis' : (p.stok <= 5 ? 'Stok Menipis' : ''),
+        label: p.stok <= 0 ? 'Waiting List' : (p.stok <= 5 ? 'Stok Menipis' : ''),
         category: p.kategori || 'Lainnya',
         image: p.image_url,
         description: p.deskripsi,
@@ -143,7 +165,7 @@ export default function CatalogPage() {
                 <div className="relative w-full aspect-square overflow-hidden bg-brand-brown/5">
                   {product.label && (
                     <span className={`absolute top-6 left-6 text-white text-[9px] font-black uppercase tracking-widest py-2 px-5 rounded-full z-10 shadow-lg ${
-                      product.label === 'Habis' ? 'bg-rose-500 shadow-rose-500/30' : 'bg-brand-gold shadow-brand-gold/30'
+                      product.label === 'Waiting List' ? 'bg-amber-600 shadow-amber-600/30' : 'bg-brand-gold shadow-brand-gold/30'
                     }`}>
                       {product.label}
                     </span>
@@ -178,11 +200,22 @@ export default function CatalogPage() {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        addToCart(product);
+                        if (product.stok <= 0) {
+                          setPreorderProduct(product);
+                          setPreorderFormData({
+                            namaKonsumen: '',
+                            whatsapp: '',
+                            jumlah: 1,
+                            catatan: ''
+                          });
+                          setPreorderSuccess(false);
+                        } else {
+                          addToCart(product);
+                        }
                       }}
                       className="w-12 h-12 rounded-2xl bg-brand-brown/5 text-brand-brown flex items-center justify-center hover:bg-brand-brown hover:text-white transition-all duration-500"
                     >
-                      <ShoppingBag className="w-5 h-5" />
+                      {product.stok <= 0 ? <Clock className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
@@ -249,27 +282,184 @@ export default function CatalogPage() {
                     <div className="text-right">
                       <p className="text-[10px] font-black text-brand-brown/30 uppercase tracking-widest mb-1">Status</p>
                       <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                        selectedProduct.stok > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                        selectedProduct.stok > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-550 bg-amber-50 text-amber-600'
                       }`}>
-                        {selectedProduct.stok > 0 ? 'Stok Ready' : 'Habis'}
+                        {selectedProduct.stok > 0 ? 'Stok Ready' : 'Waiting List'}
                       </span>
                     </div>
                   </div>
 
                   <button 
                     onClick={() => {
-                      addToCart(selectedProduct);
-                      setSelectedProduct(null);
+                      if (selectedProduct.stok <= 0) {
+                        setPreorderProduct(selectedProduct);
+                        setSelectedProduct(null);
+                        setPreorderFormData({
+                          namaKonsumen: '',
+                          whatsapp: '',
+                          jumlah: 1,
+                          catatan: ''
+                        });
+                        setPreorderSuccess(false);
+                      } else {
+                        addToCart(selectedProduct);
+                        setSelectedProduct(null);
+                      }
                     }}
-                    disabled={selectedProduct.stok <= 0}
-                    className="w-full py-6 bg-brand-brown text-white rounded-[1.5rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-brand-gold hover:text-brand-brown transition-all duration-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-4"
+                    className="w-full py-6 bg-brand-brown text-white rounded-[1.5rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-brand-gold hover:text-brand-brown transition-all duration-500 flex items-center justify-center gap-4 animate-pulse-slow"
                   >
-                    <ShoppingBag className="w-5 h-5" />
-                    {selectedProduct.stok <= 0 ? 'Stok Kosong' : 'Tambah ke Keranjang'}
+                    {selectedProduct.stok <= 0 ? <Clock className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
+                    {selectedProduct.stok <= 0 ? 'Masuk Waiting List' : 'Tambah ke Keranjang'}
                   </button>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pre-Order Modal */}
+      {preorderProduct && (
+        <div className="fixed inset-0 z-[110] overflow-y-auto bg-brand-brown/85 backdrop-blur-xl p-4 md:p-8 flex items-center justify-center">
+          <div className="relative bg-white w-full max-w-xl rounded-[2.5rem] overflow-hidden shadow-3xl animate-slide-up p-8 md:p-10 border border-brand-brown/5">
+            <button 
+              onClick={() => setPreorderProduct(null)}
+              className="absolute top-6 right-6 w-10 h-10 hover:bg-brand-brown hover:text-white text-brand-brown/40 rounded-xl flex items-center justify-center transition-all border border-brand-brown/5 text-xl font-light"
+            >
+              ×
+            </button>
+
+            {preorderSuccess ? (
+              <div className="text-center py-10 flex flex-col items-center animate-fade-in">
+                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6">
+                  <CheckCircle2 className="w-10 h-10" />
+                </div>
+                <h3 className="text-2xl font-heading font-black text-brand-brown mb-2 tracking-tight">Waiting List Terkirim!</h3>
+                <p className="text-brand-brown/60 text-sm font-medium max-w-sm mb-6">Pendaftaran waiting list Anda berhasil. Anda akan diarahkan ke WhatsApp untuk konfirmasi langsung.</p>
+                <Loader2 className="w-6 h-6 text-brand-gold animate-spin" />
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="p-3 bg-brand-gold/10 rounded-2xl text-brand-gold">
+                    <ClipboardList className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-brand-brown tracking-tight">Formulir Waiting List</h2>
+                    <p className="text-[10px] text-brand-brown/40 font-bold uppercase tracking-widest mt-0.5">Daftar Waiting List Gula Kabung</p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-brand-brown/5 rounded-2xl border border-brand-brown/5 mb-6 flex gap-4 items-center">
+                  <div className="w-14 h-14 rounded-xl overflow-hidden bg-brand-brown/10 shrink-0">
+                    {preorderProduct.image ? (
+                      <img src={preorderProduct.image} alt={preorderProduct.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center"><ShoppingBag className="w-6 h-6 text-brand-brown/20" /></div>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-brand-brown leading-tight">{preorderProduct.name}</h4>
+                    <p className="text-[10px] font-bold text-brand-gold uppercase tracking-widest mt-1">{preorderProduct.ukuran || 'Kemasan Standard'}</p>
+                  </div>
+                </div>
+
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!preorderFormData.namaKonsumen.trim()) return toast.error('Nama wajib diisi!');
+                  if (!preorderFormData.whatsapp.trim()) return toast.error('WhatsApp wajib diisi!');
+                  
+                  try {
+                    setPreorderSubmitting(true);
+                    const { error } = await supabase.from('kabung_preorders').insert([
+                      {
+                        nama_konsumen: preorderFormData.namaKonsumen,
+                        whatsapp: preorderFormData.whatsapp,
+                        produk_id: preorderProduct.id,
+                        nama_produk: preorderProduct.name,
+                        jumlah: Number(preorderFormData.jumlah),
+                        catatan: preorderFormData.catatan || '',
+                        status: 'Waiting'
+                      }
+                    ]);
+
+                    if (error) throw error;
+                    
+                    setPreorderSuccess(true);
+                    toast.success('Berhasil mendaftar Waiting List!');
+                    
+                    const message = `Halo Gula Kabung Belitung, saya ingin masuk Waiting List untuk produk premium Anda.\n\nProduk: ${preorderProduct.name}\nNama Pemesan: ${preorderFormData.namaKonsumen}\nNo. WhatsApp: ${preorderFormData.whatsapp}\nJumlah: ${preorderFormData.jumlah} pcs\nCatatan: ${preorderFormData.catatan || '-'}`;
+                    const waUrl = `https://wa.me/${whatsapp}?text=${encodeURIComponent(message)}`;
+                    
+                    setTimeout(() => {
+                      window.open(waUrl, '_blank');
+                      setPreorderProduct(null);
+                    }, 2000);
+                  } catch (err) {
+                    console.error('Error inserting preorder:', err);
+                    toast.error('Gagal memproses pre-order: ' + err.message);
+                  } finally {
+                    setPreorderSubmitting(false);
+                  }
+                }} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-brand-brown/60 mb-1.5">Nama Lengkap *</label>
+                    <input 
+                      required 
+                      type="text" 
+                      value={preorderFormData.namaKonsumen}
+                      onChange={(e) => setPreorderFormData({ ...preorderFormData, namaKonsumen: e.target.value })}
+                      className="w-full px-4 py-3.5 border border-brand-brown/10 rounded-xl outline-none focus:border-brand-gold font-bold text-sm text-brand-brown"
+                      placeholder="Ketik nama lengkap..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-brand-brown/60 mb-1.5">No. WhatsApp *</label>
+                    <input 
+                      required 
+                      type="tel" 
+                      value={preorderFormData.whatsapp}
+                      onChange={(e) => setPreorderFormData({ ...preorderFormData, whatsapp: e.target.value })}
+                      className="w-full px-4 py-3.5 border border-brand-brown/10 rounded-xl outline-none focus:border-brand-gold font-bold text-sm text-brand-brown"
+                      placeholder="Contoh: 0812345678..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-brand-brown/60 mb-1.5">Jumlah Pesanan *</label>
+                    <input 
+                      required 
+                      type="number" 
+                      min="1" 
+                      value={preorderFormData.jumlah}
+                      onChange={(e) => setPreorderFormData({ ...preorderFormData, jumlah: e.target.value })}
+                      className="w-full px-4 py-3.5 border border-brand-brown/10 rounded-xl outline-none focus:border-brand-gold font-bold text-sm text-brand-brown"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-brand-brown/60 mb-1.5">Catatan Khusus</label>
+                    <textarea 
+                      rows="2"
+                      value={preorderFormData.catatan}
+                      onChange={(e) => setPreorderFormData({ ...preorderFormData, catatan: e.target.value })}
+                      className="w-full px-4 py-3.5 border border-brand-brown/10 rounded-xl outline-none focus:border-brand-gold font-bold text-sm text-brand-brown"
+                      placeholder="Tulis jika ada permintaan khusus..."
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={preorderSubmitting}
+                    className="w-full mt-4 py-4 bg-brand-brown hover:bg-brand-gold hover:text-brand-brown text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-3 shadow-xl shadow-brand-brown/10"
+                  >
+                    {preorderSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+                    {preorderSubmitting ? 'Mengirim...' : 'Daftar Waiting List Sekarang'}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       )}

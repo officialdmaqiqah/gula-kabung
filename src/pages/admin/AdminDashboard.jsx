@@ -13,7 +13,8 @@ import {
   ArrowRightLeft,
   ArrowUpRight,
   ArrowDownRight,
-  Wallet
+  Wallet,
+  ClipboardList
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -27,6 +28,7 @@ export default function AdminDashboard() {
   const [accounts, setAccounts] = useState([]);
   const [mutations, setMutations] = useState([]);
   const [receiving, setReceiving] = useState([]);
+  const [preorders, setPreorders] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Safe Date Handling
@@ -51,7 +53,7 @@ export default function AdminDashboard() {
           }
         };
 
-        const [s, e, p, i, prod, acc, mut, rec] = await Promise.all([
+        const [s, e, p, i, prod, acc, mut, rec, pre] = await Promise.all([
           fetchTable('kabung_sales'),
           fetchTable('kabung_expenses'),
           fetchTable('kabung_purchases'),
@@ -59,7 +61,8 @@ export default function AdminDashboard() {
           fetchTable('kabung_products'),
           fetchTable('kabung_accounts'),
           fetchTable('kabung_mutations'),
-          fetchTable('kabung_receiving')
+          fetchTable('kabung_receiving'),
+          fetchTable('kabung_preorders')
         ]);
 
         if (isMounted) {
@@ -71,6 +74,7 @@ export default function AdminDashboard() {
           setAccounts(acc);
           setMutations(mut);
           setReceiving(rec);
+          setPreorders(pre);
         }
       } catch (err) {
         console.error('AdminDashboard: Data fetch error:', err);
@@ -141,6 +145,7 @@ export default function AdminDashboard() {
     });
 
     const totalBalance = (products || []).reduce((acc, p) => acc + Number(p.stok || 0), 0);
+    const activePreordersCount = (preorders || []).filter(item => item && (item.status === 'Waiting' || item.status === 'Dihubungi')).length;
 
     return {
       salesToday: sToday,
@@ -152,9 +157,10 @@ export default function AdminDashboard() {
       pcsOutMonth,
       pcsInAllTime,
       pcsOutAllTime,
-      totalPcsBalance: totalBalance
+      totalPcsBalance: totalBalance,
+      activePreorders: activePreordersCount
     };
-  }, [sales, expenses, purchases, incomes, receiving, products, today, thisMonth]);
+  }, [sales, expenses, purchases, incomes, receiving, products, preorders, today, thisMonth]);
 
   const accountBalances = useMemo(() => {
     const balances = {};
@@ -386,41 +392,71 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* Low Stock Warning */}
-          <div className="lg:col-span-4 bg-white rounded-[2.5rem] p-8 flex flex-col shadow-xl border border-brand-brown/5">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-xl font-black text-brand-brown tracking-tight flex items-center gap-3">
-                  <AlertTriangle className="w-6 h-6 text-brand-gold" />
-                  Stok Menipis
-                </h2>
+          {/* Alerts & Waiting List Column */}
+          <div className="lg:col-span-4 space-y-6 flex flex-col">
+            {/* Waiting List Card */}
+            <div className="bg-white rounded-[2.5rem] p-8 flex flex-col shadow-xl border border-brand-brown/5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-amber-500/10 text-amber-600 rounded-2xl">
+                    <ClipboardList className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-brand-brown tracking-tight">Waiting List</h2>
+                    <p className="text-[10px] text-brand-brown/40 font-bold uppercase tracking-widest italic">Daftar Tunggu</p>
+                  </div>
+                </div>
+                <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-600">
+                  <span className="text-sm font-black">{stats.activePreorders}</span>
+                </div>
               </div>
-              <div className="w-10 h-10 bg-brand-gold/10 rounded-xl flex items-center justify-center">
-                <span className="text-sm font-black text-brand-gold">{lowStockProducts.length}</span>
-              </div>
+              <p className="text-xs text-brand-brown/50 font-semibold mb-6">
+                Ada {stats.activePreorders} konsumen dalam daftar tunggu stok Gula Kabung.
+              </p>
+              <button 
+                onClick={() => navigate('/admin/preorders')}
+                className="w-full py-4 bg-brand-brown hover:bg-brand-gold hover:text-brand-brown text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-md"
+              >
+                Kelola Waiting List
+              </button>
             </div>
 
-            <div className="flex-grow space-y-4 overflow-y-auto max-h-[300px] pr-2 no-scrollbar">
-              {lowStockProducts.length > 0 ? (
-                lowStockProducts.map(p => (
-                  <div key={p.id} className="p-5 bg-white border border-brand-brown/5 rounded-2xl">
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-brand-brown truncate">{p.nama_produk}</p>
-                        <p className="text-[10px] text-brand-brown/40 font-bold uppercase tracking-widest">{p.ukuran}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className={`text-xl font-black ${Number(p.stok || 0) === 0 ? 'text-rose-500' : 'text-brand-gold'}`}>
-                          {p.stok}
-                        </p>
-                        <p className="text-[10px] font-bold text-brand-brown/20 uppercase">{p.satuan}</p>
+            {/* Low Stock Warning */}
+            <div className="bg-white rounded-[2.5rem] p-8 flex flex-col shadow-xl border border-brand-brown/5">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h2 className="text-xl font-black text-brand-brown tracking-tight flex items-center gap-3">
+                    <AlertTriangle className="w-6 h-6 text-brand-gold" />
+                    Stok Menipis
+                  </h2>
+                </div>
+                <div className="w-10 h-10 bg-brand-gold/10 rounded-xl flex items-center justify-center">
+                  <span className="text-sm font-black text-brand-gold">{lowStockProducts.length}</span>
+                </div>
+              </div>
+
+              <div className="flex-grow space-y-4 overflow-y-auto max-h-[200px] pr-2 no-scrollbar">
+                {lowStockProducts.length > 0 ? (
+                  lowStockProducts.map(p => (
+                    <div key={p.id} className="p-5 bg-white border border-brand-brown/5 rounded-2xl">
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-brand-brown truncate">{p.nama_produk}</p>
+                          <p className="text-[10px] text-brand-brown/40 font-bold uppercase tracking-widest">{p.ukuran}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-xl font-black ${Number(p.stok || 0) === 0 ? 'text-rose-500' : 'text-brand-gold'}`}>
+                            {p.stok}
+                          </p>
+                          <p className="text-[10px] font-bold text-brand-brown/20 uppercase">{p.satuan}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-xs text-brand-brown/30 py-10 font-bold uppercase tracking-widest">Semua Stok Aman</p>
-              )}
+                  ))
+                ) : (
+                  <p className="text-center text-xs text-brand-brown/30 py-10 font-bold uppercase tracking-widest">Semua Stok Aman</p>
+                )}
+              </div>
             </div>
           </div>
         </div>

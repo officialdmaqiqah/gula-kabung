@@ -21,6 +21,7 @@ import AdminReports from './pages/admin/AdminReports';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminReceiving from './pages/admin/AdminReceiving';
 import AdminMutations from './pages/admin/AdminMutations';
+import AdminPreorders from './pages/admin/AdminPreorders';
 
 function App() {
   const location = useLocation();
@@ -83,6 +84,7 @@ function App() {
               <Route path="finances" element={<AdminFinances />} />
               <Route path="reports" element={<AdminReports />} />
               <Route path="mutations" element={<AdminMutations />} />
+              <Route path="preorders" element={<AdminPreorders />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
           </Routes>
