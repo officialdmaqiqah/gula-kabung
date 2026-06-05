@@ -150,7 +150,7 @@ export default function AdminReports() {
     return { revenue, cogs, grossProfit: revenue - cogs, opex, otherIncome: otherInc, netProfit };
   }, [filteredSales, filteredExpenses, products, filteredIncomes]);
 
-  // TUTUP BUKU CALCULATIONS (With 40-10-10-40 Rule and Rounding Adjustment)
+  // TUTUP BUKU CALCULATIONS (With 40-10-10-40 Rule and Rounding to Nearest 1,000)
   const closingData = useMemo(() => {
     const monthSales = sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.tanggal.startsWith(selectedClosingMonth));
     const monthExpenses = expenses.filter(e => e.tanggal.startsWith(selectedClosingMonth));
@@ -177,21 +177,24 @@ export default function AdminReports() {
     const isAlreadyClosed = monthExpenses.some(e => e.kategori === 'Bagi Hasil Investor');
     const finalProfit = closingMode === 'kumulatif' ? cumulativeNetProfit : mNetProfit;
 
-    // Split buckets using whole Rupiah rounding
-    const alokasiSedekah = Math.round(finalProfit * 0.10);
-    const alokasiSelfDev = Math.round(finalProfit * 0.10);
-    const alokasiDividen = Math.round(finalProfit * 0.40);
-    // Investasi acts as the balancer to absorb any rounding differences
+    // Helper to round to the nearest Rp 1.000
+    const roundTo1000 = (num) => Math.round(num / 1000) * 1000;
+
+    // Split buckets: round distributed ones to nearest Rp 1.000
+    const alokasiSedekah = roundTo1000(finalProfit * 0.10);
+    const alokasiSelfDev = roundTo1000(finalProfit * 0.10);
+    const alokasiDividen = roundTo1000(finalProfit * 0.40);
+    // Investasi (virtual ledger) acts as the balancer to absorb any rounding differences
     const alokasiInvestasi = finalProfit - alokasiSedekah - alokasiSelfDev - alokasiDividen;
 
-    // Calculate rounded individual investor dividends
+    // Calculate rounded individual investor dividends (rounded to nearest Rp 1.000)
     let allocatedDividends = 0;
     const roundedInvestorDividends = investors.map((inv, index) => {
       let amount = 0;
       if (index === investors.length - 1) {
         amount = alokasiDividen - allocatedDividends;
       } else {
-        amount = Math.round(alokasiDividen * (Number(inv.persentase) / 100));
+        amount = roundTo1000(alokasiDividen * (Number(inv.persentase) / 100));
         allocatedDividends += amount;
       }
       return {
