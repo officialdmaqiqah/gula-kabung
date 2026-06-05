@@ -153,8 +153,17 @@ export default function AdminReports() {
   // TUTUP BUKU CALCULATIONS (With 40-10-10-40 Rule and Rounding to Nearest 1,000)
   const closingData = useMemo(() => {
     const monthSales = sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.tanggal.startsWith(selectedClosingMonth));
-    const monthExpenses = expenses.filter(e => e.tanggal.startsWith(selectedClosingMonth));
-    const monthIncomes = incomes.filter(i => i.tanggal.startsWith(selectedClosingMonth) && i.kategori !== 'Modal Awal');
+    
+    // Exclude the Tutup Buku allocations themselves from the Net Profit calculation to see the pre-allocation values
+    const monthExpenses = expenses.filter(e => 
+      e.tanggal.startsWith(selectedClosingMonth) && 
+      !['Alokasi Investasi', 'Alokasi Sedekah', "Ka'bah", 'Bagi Hasil Investor'].includes(e.kategori)
+    );
+    const monthIncomes = incomes.filter(i => 
+      i.tanggal.startsWith(selectedClosingMonth) && 
+      i.kategori !== 'Modal Awal' &&
+      !['Alokasi Investasi', 'Alokasi Sedekah', "Ka'bah"].includes(i.kategori)
+    );
 
     const mRevenue = monthSales.reduce((sum, s) => sum + Number(s.total_penjualan), 0);
     const mCogs = monthSales.reduce((sum, s) => {
@@ -170,11 +179,16 @@ export default function AdminReports() {
       const product = products.find(p => p.id === s.produk_id);
       return sum + ((product ? Number(product.harga_modal) : 0) * Number(s.jumlah));
     }, 0);
-    const cumulativeOpex = expenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
-    const cumulativeOtherInc = incomes.filter(i => i.kategori !== 'Modal Awal').reduce((sum, i) => sum + Number(i.jumlah), 0);
+    const cumulativeOpex = expenses
+      .filter(e => !['Alokasi Investasi', 'Alokasi Sedekah', "Ka'bah", 'Bagi Hasil Investor'].includes(e.kategori))
+      .reduce((sum, e) => sum + Number(e.jumlah), 0);
+    const cumulativeOtherInc = incomes
+      .filter(i => i.kategori !== 'Modal Awal' && !['Alokasi Investasi', 'Alokasi Sedekah', "Ka'bah"].includes(i.kategori))
+      .reduce((sum, i) => sum + Number(i.jumlah), 0);
     const cumulativeNetProfit = (cumulativeRevenue - cumulativeCogs - cumulativeOpex + cumulativeOtherInc);
 
-    const isAlreadyClosed = monthExpenses.some(e => e.kategori === 'Bagi Hasil Investor');
+    // Check if already closed by searching the unfiltered expenses list
+    const isAlreadyClosed = expenses.some(e => e.tanggal.startsWith(selectedClosingMonth) && e.kategori === 'Bagi Hasil Investor');
     const finalProfit = closingMode === 'kumulatif' ? cumulativeNetProfit : mNetProfit;
 
     // Helper to round to the nearest Rp 1.000
@@ -428,7 +442,17 @@ export default function AdminReports() {
                 <button onClick={() => setClosingMode('kumulatif')} className={`flex-1 p-5 rounded-3xl border transition-all text-left ${closingMode === 'kumulatif' ? 'bg-brand-gold text-brand-brown border-brand-gold shadow-xl' : 'bg-white text-brand-brown/60 border-brand-brown/10'}`}><p className="text-[9px] font-black uppercase opacity-60">Mode</p><p className="font-bold">Akumulatif</p><p className="text-xs mt-1">{formatRupiah(closingData.cumulativeNetProfit)}</p></button>
               </div>
 
-              {!closingData.isAlreadyClosed && closingData.finalProfit > 0 && (
+              {closingData.isAlreadyClosed && (
+                <div className="bg-emerald-50 border border-emerald-100 p-8 rounded-[2rem] flex items-center gap-6 mb-8">
+                  <CheckCircle2 className="w-12 h-12 text-emerald-500 shrink-0" />
+                  <div>
+                    <h4 className="text-lg font-black text-emerald-900">Bulan Ini Sudah Ditutup</h4>
+                    <p className="text-xs text-emerald-700/60 mt-0.5">Seluruh alokasi dana (40-10-10-40) telah dicatat ke pengeluaran.</p>
+                  </div>
+                </div>
+              )}
+
+              {(closingData.finalProfit > 0 || closingData.isAlreadyClosed) && (
                 <div className="space-y-8">
                   {/* BUCKETS GRID */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -448,7 +472,9 @@ export default function AdminReports() {
 
                   {/* INVESTOR LIST */}
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-brand-brown/40 uppercase tracking-widest">Distribusi Bagi Hasil (40% Pool)</h4>
+                    <h4 className="text-[10px] font-black text-brand-brown/40 uppercase tracking-widest">
+                      {closingData.isAlreadyClosed ? 'Distribusi Bagi Hasil Terbayar (40% Pool)' : 'Distribusi Bagi Hasil (40% Pool)'}
+                    </h4>
                     <div className="bg-brand-brown/[0.02] border border-brand-brown/5 rounded-[2rem] overflow-hidden divide-y divide-brand-brown/5">
                       {closingData.roundedInvestorDividends.map(inv => (
                         <div key={inv.id} className="p-6 flex justify-between items-center group hover:bg-white transition-colors">
@@ -459,14 +485,12 @@ export default function AdminReports() {
                     </div>
                   </div>
 
-                  <button onClick={() => setIsConfirmModalOpen(true)} disabled={processing} className="w-full py-6 bg-brand-brown text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-brand-gold hover:text-brand-brown transition-all flex items-center justify-center gap-4 disabled:opacity-50">
-                    <Lock className="w-5 h-5" /> Proses Tutup Buku & Alokasi Dana
-                  </button>
+                  {!closingData.isAlreadyClosed && (
+                    <button onClick={() => setIsConfirmModalOpen(true)} disabled={processing} className="w-full py-6 bg-brand-brown text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-brand-gold hover:text-brand-brown transition-all flex items-center justify-center gap-4 disabled:opacity-50">
+                      <Lock className="w-5 h-5" /> Proses Tutup Buku & Alokasi Dana
+                    </button>
+                  )}
                 </div>
-              )}
- 
-              {closingData.isAlreadyClosed && (
-                <div className="bg-emerald-50 border border-emerald-100 p-10 rounded-[2.5rem] flex items-center gap-8"><CheckCircle2 className="w-16 h-16 text-emerald-500 shrink-0" /><div><h4 className="text-xl font-black text-emerald-900">Bulan Ini Sudah Ditutup</h4><p className="text-sm text-emerald-700/60 mt-1">Seluruh alokasi dana (40-10-10-40) telah dicatat ke pengeluaran.</p></div></div>
               )}
             </div>
           </div>
