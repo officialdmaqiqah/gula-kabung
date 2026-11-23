@@ -138,35 +138,9 @@ export default function AdminSales() {
         catatan: formData.catatan
       };
 
-      if (editingId) {
-        const oldSale = sales.find(s => s.id === editingId);
-        const { error } = await supabase.from('kabung_sales').update(payload).eq('id', editingId);
-        if (error) throw error;
-
-        // Update Stock in DB
-        const diff = Number(formData.jumlah) - (oldSale ? oldSale.jumlah : 0);
-        if (diff !== 0) {
-          const product = products.find(p => p.id.toString() === formData.produkId);
-          if (product) {
-            await supabase.from('kabung_products').update({ 
-              stok: product.stok - diff 
-            }).eq('id', formData.produkId);
-          }
-        }
-        toast.success('Transaksi diperbarui!');
-      } else {
-        const { error } = await supabase.from('kabung_sales').insert([payload]);
-        if (error) throw error;
-
-        // Decrease Stock in DB
-        const product = products.find(p => p.id.toString() === formData.produkId);
-        if (product) {
-          await supabase.from('kabung_products').update({ 
-            stok: product.stok - Number(formData.jumlah) 
-          }).eq('id', formData.produkId);
-        }
-        toast.success('Transaksi penjualan berhasil dicatat!');
-      }
+      const { error } = await supabase.rpc('save_kabung_sale', { p_id: editingId, p_sale: payload });
+      if (error) throw error;
+      toast.success(editingId ? 'Transaksi diperbarui!' : 'Transaksi penjualan berhasil dicatat!');
 
       await fetchInitialData();
       setIsModalOpen(false);
@@ -181,19 +155,7 @@ export default function AdminSales() {
     if (window.confirm('Yakin ingin menghapus transaksi ini? Stok produk akan dikembalikan.')) {
       try {
         setLoading(true);
-        const saleToDelete = sales.find(s => s.id === id);
-        
-        if (saleToDelete) {
-          // Return stock
-          const product = products.find(p => p.id.toString() === saleToDelete.produk_id);
-          if (product) {
-            await supabase.from('kabung_products').update({ 
-              stok: product.stok + saleToDelete.jumlah 
-            }).eq('id', saleToDelete.produk_id);
-          }
-        }
-
-        const { error } = await supabase.from('kabung_sales').delete().eq('id', id);
+        const { error } = await supabase.rpc('delete_kabung_sale', { p_id: id });
         if (error) throw error;
         
         await fetchInitialData();

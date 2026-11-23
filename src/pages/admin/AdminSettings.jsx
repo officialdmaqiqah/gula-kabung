@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
+import { calcAccountBalances } from '../../utils/finance';
 import { Plus, Edit, Trash2, Users, CreditCard, Truck, Settings, Loader2, Save } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -16,6 +17,7 @@ export default function AdminSettings() {
   const [purchases, setPurchases] = useState([]);
   const [incomes, setIncomes] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [mutations, setMutations] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -42,6 +44,7 @@ export default function AdminSettings() {
       const { data: purchasesData } = await supabase.from('kabung_purchases').select('harga_beli_total, rekening_id');
       const { data: incomesData } = await supabase.from('kabung_incomes').select('jumlah, rekening_id');
       const { data: expensesData } = await supabase.from('kabung_expenses').select('jumlah, rekening_id');
+      const { data: mutationsData } = await supabase.from('kabung_mutations').select('jumlah, dari_rekening_id, ke_rekening_id');
 
       setInvestors(investorsData || []);
       setAccounts(accountsData || []);
@@ -55,6 +58,7 @@ export default function AdminSettings() {
       setPurchases(purchasesData || []);
       setIncomes(incomesData || []);
       setExpenses(expensesData || []);
+      setMutations(mutationsData || []);
     } catch (error) {
       console.error('Error fetching settings data:', error.message);
     } finally {
@@ -114,6 +118,11 @@ export default function AdminSettings() {
         if (editingId) {
           const { error } = await supabase.from('kabung_investors').update(payload).eq('id', editingId);
           if (error) throw error;
+          const income_id = investors.find(i => i.id === editingId)?.income_id;
+          if (income_id) {
+            const { error: incomeError } = await supabase.from('kabung_incomes').update({ jumlah: payload.modal }).eq('id', income_id);
+            if (incomeError) throw incomeError;
+          }
         } else {
           // New investor, create income automatically
           const { data: newInc, error: incError } = await supabase.from('kabung_incomes').insert([{
@@ -191,30 +200,10 @@ export default function AdminSettings() {
     }
   };
 
-  const calculateAccountBalances = useMemo(() => {
-    const balances = {};
-    accounts.forEach(acc => {
-      balances[acc.id] = Number(acc.saldo_awal) || 0;
-    });
-
-    sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.rekening_id).forEach(s => {
-      if (balances[s.rekening_id] !== undefined) balances[s.rekening_id] += Number(s.total_penjualan);
-    });
-
-    incomes.filter(i => i.rekening_id).forEach(i => {
-      if (balances[i.rekening_id] !== undefined) balances[i.rekening_id] += Number(i.jumlah);
-    });
-
-    purchases.filter(p => p.rekening_id).forEach(p => {
-      if (balances[p.rekening_id] !== undefined) balances[p.rekening_id] -= Number(p.harga_beli_total);
-    });
-
-    expenses.filter(e => e.rekening_id).forEach(e => {
-      if (balances[e.rekening_id] !== undefined) balances[e.rekening_id] -= Number(e.jumlah);
-    });
-
-    return balances;
-  }, [accounts, sales, incomes, purchases, expenses]);
+  const calculateAccountBalances = useMemo(
+    () => calcAccountBalances(accounts, { sales, incomes, purchases, expenses, mutations }),
+    [accounts, sales, incomes, purchases, expenses, mutations]
+  );
 
   return (
     <div>

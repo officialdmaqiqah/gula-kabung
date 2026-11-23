@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { calcProfit, isOtherIncome } from '../../utils/finance';
 import { formatRupiah } from '../../utils/format';
 import { 
   TrendingUp, 
@@ -90,8 +91,7 @@ export default function AdminDashboard() {
   // Safe Calculations
   const stats = useMemo(() => {
     let sToday = 0;
-    let sMonth = 0;
-    let eMonth = 0;
+
     let txCount = 0;
     let pcsInMonth = 0;
     let pcsOutMonth = 0;
@@ -107,33 +107,23 @@ export default function AdminDashboard() {
         
         if (sale.tanggal === today) sToday += val;
         if (sale.tanggal && sale.tanggal.startsWith(thisMonth)) {
-          sMonth += val;
+
           txCount++;
           pcsOutMonth += qty;
         }
       }
     });
 
-    (expenses || []).forEach(exp => {
-      if (exp && exp.tanggal && exp.tanggal.startsWith(thisMonth)) {
-        eMonth += Number(exp.jumlah || 0);
-      }
-    });
-
-    (purchases || []).forEach(p => {
-      if (p && p.tanggal && p.tanggal.startsWith(thisMonth)) {
-        eMonth += Number(p.harga_beli_total || 0);
-      }
-    });
-
     (incomes || []).forEach(i => {
-      if (i) {
-        const val = Number(i.jumlah || 0);
-        if (i.tanggal === today) sToday += val;
-        if (i.tanggal && i.tanggal.startsWith(thisMonth)) {
-          sMonth += val;
-        }
-      }
+      if (i && isOtherIncome(i) && i.tanggal === today) sToday += Number(i.jumlah || 0);
+    });
+
+    const inThisMonth = (item) => item?.tanggal?.startsWith(thisMonth);
+    const monthProfit = calcProfit({
+      sales: (sales || []).filter(inThisMonth),
+      expenses: (expenses || []).filter(inThisMonth),
+      incomes: (incomes || []).filter(inThisMonth),
+      products: products || []
     });
 
     (receiving || []).forEach(r => {
@@ -149,10 +139,10 @@ export default function AdminDashboard() {
 
     return {
       salesToday: sToday,
-      salesThisMonth: sMonth,
-      expensesThisMonth: eMonth,
+      salesThisMonth: monthProfit.revenue + monthProfit.otherIncome,
+      expensesThisMonth: monthProfit.cogs + monthProfit.opex,
       txCountThisMonth: txCount,
-      profitLoss: sMonth - eMonth,
+      profitLoss: monthProfit.netProfit,
       pcsInMonth,
       pcsOutMonth,
       pcsInAllTime,
@@ -160,7 +150,7 @@ export default function AdminDashboard() {
       totalPcsBalance: totalBalance,
       activePreorders: activePreordersCount
     };
-  }, [sales, expenses, purchases, incomes, receiving, products, preorders, today, thisMonth]);
+  }, [sales, expenses, incomes, receiving, products, preorders, today, thisMonth]);
 
   const accountBalances = useMemo(() => {
     const balances = {};

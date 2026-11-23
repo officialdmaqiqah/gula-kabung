@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { formatRupiah } from '../../utils/format';
 import { FileText, Calendar, Download, Loader2, PieChart, TrendingUp, Wallet, ShieldCheck, Briefcase, Lock, CheckCircle2, AlertCircle, Clock, ArrowRight, Heart, Zap, Gem } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { calcAccountBalances, calcBalanceSheet, calcCashflow, calcClosing, calcProfit } from '../../utils/finance';
 
 export default function AdminReports() {
   const [activeTab, setActiveTab] = useState('labarugi');
@@ -35,16 +36,7 @@ export default function AdminReports() {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [
-        { data: sData },
-        { data: pData },
-        { data: eData },
-        { data: iData },
-        { data: prodData },
-        { data: accData },
-        { data: invData },
-        { data: mutData }
-      ] = await Promise.all([
+      const results = await Promise.all([
         supabase.from('kabung_sales').select('*'),
         supabase.from('kabung_purchases').select('*'),
         supabase.from('kabung_expenses').select('*'),
@@ -54,6 +46,9 @@ export default function AdminReports() {
         supabase.from('kabung_investors').select('*'),
         supabase.from('kabung_mutations').select('*')
       ]);
+      const failed = results.find(r => r.error);
+      if (failed) throw failed.error;
+      const [sData, pData, eData, iData, prodData, accData, invData, mutData] = results.map(r => r.data);
 
       setSales(sData || []);
       setPurchases(pData || []);
@@ -69,6 +64,7 @@ export default function AdminReports() {
       setMutations(mutData || []);
     } catch (error) {
       console.error('Error fetching data for reports:', error.message);
+      toast.error('Gagal memuat laporan: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -107,191 +103,38 @@ export default function AdminReports() {
   }, [sales, expenses, purchases, incomes, filterPeriod, filterMonth, customStartDate, customEndDate]);
 
   // ACCOUNT BALANCES CALCULATION
-  const accountBalances = useMemo(() => {
-    const balances = {};
-    accounts.forEach(acc => {
-      balances[acc.id] = Number(acc.saldo_awal) || 0;
-    });
-
-    sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.rekening_id).forEach(s => {
-      if (balances[s.rekening_id] !== undefined) balances[s.rekening_id] += Number(s.total_penjualan);
-    });
-
-    incomes.filter(i => i.rekening_id).forEach(i => {
-      if (balances[i.rekening_id] !== undefined) balances[i.rekening_id] += Number(i.jumlah);
-    });
-
-    purchases.filter(p => p.rekening_id).forEach(p => {
-      if (balances[p.rekening_id] !== undefined) balances[p.rekening_id] -= Number(p.harga_beli_total);
-    });
-
-    expenses.filter(e => e.rekening_id).forEach(e => {
-      if (balances[e.rekening_id] !== undefined) balances[e.rekening_id] -= Number(e.jumlah);
-    });
-
-    mutations.forEach(m => {
-      if (m.dari_rekening_id && balances[m.dari_rekening_id] !== undefined) balances[m.dari_rekening_id] -= Number(m.jumlah);
-      if (m.ke_rekening_id && balances[m.ke_rekening_id] !== undefined) balances[m.ke_rekening_id] += Number(m.jumlah);
-    });
-
-    return balances;
-  }, [accounts, sales, incomes, purchases, expenses, mutations]);
+  const accountBalances = useMemo(
+    () => calcAccountBalances(accounts, { sales, incomes, purchases, expenses, mutations }),
+    [accounts, sales, incomes, purchases, expenses, mutations]
+  );
 
   // LABA RUGI CALCULATIONS
-  const pnl = useMemo(() => {
-    const revenue = filteredSales.reduce((sum, s) => sum + Number(s.total_penjualan), 0);
-    const cogs = filteredSales.reduce((sum, s) => {
-      const product = products.find(p => p.id === s.produk_id);
-      return sum + ((product ? Number(product.harga_modal) : 0) * Number(s.jumlah));
-    }, 0);
-    const opex = filteredExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
-    const otherInc = filteredIncomes.reduce((sum, i) => i.kategori === 'Modal Awal' ? sum : sum + Number(i.jumlah), 0);
-    const netProfit = revenue - cogs - opex + otherInc;
-    return { revenue, cogs, grossProfit: revenue - cogs, opex, otherIncome: otherInc, netProfit };
-  }, [filteredSales, filteredExpenses, products, filteredIncomes]);
+  const pnl = useMemo(
+    () => calcProfit({ sales: filteredSales, expenses: filteredExpenses, incomes: filteredIncomes, products }),
+    [filteredSales, filteredExpenses, products, filteredIncomes]
+  );
 
-  // TUTUP BUKU CALCULATIONS (With 40-10-10-40 Rule and Rounding to Nearest 1,000)
-  const closingData = useMemo(() => {
-    const monthSales = sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.tanggal.startsWith(selectedClosingMonth));
-    
-    // Exclude the Tutup Buku allocations themselves from the Net Profit calculation to see the pre-allocation values
-    const monthExpenses = expenses.filter(e => 
-      e.tanggal.startsWith(selectedClosingMonth) && 
-      !['Alokasi Investasi', 'Alokasi Sedekah', "Ka'bah", 'Bagi Hasil Investor'].includes(e.kategori)
-    );
-    const monthIncomes = incomes.filter(i => 
-      i.tanggal.startsWith(selectedClosingMonth) && 
-      i.kategori !== 'Modal Awal' &&
-      !['Alokasi Investasi', 'Alokasi Sedekah', "Ka'bah"].includes(i.kategori)
-    );
-
-    const mRevenue = monthSales.reduce((sum, s) => sum + Number(s.total_penjualan), 0);
-    const mCogs = monthSales.reduce((sum, s) => {
-      const product = products.find(p => p.id === s.produk_id);
-      return sum + ((product ? Number(product.harga_modal) : 0) * Number(s.jumlah));
-    }, 0);
-    const mOpex = monthExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
-    const mOtherInc = monthIncomes.reduce((sum, i) => sum + Number(i.jumlah), 0);
-    const mNetProfit = (mRevenue - mCogs - mOpex + mOtherInc);
-
-    const cumulativeRevenue = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => sum + Number(s.total_penjualan), 0);
-    const cumulativeCogs = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => {
-      const product = products.find(p => p.id === s.produk_id);
-      return sum + ((product ? Number(product.harga_modal) : 0) * Number(s.jumlah));
-    }, 0);
-    const cumulativeOpex = expenses
-      .filter(e => !['Alokasi Investasi', 'Alokasi Sedekah', "Ka'bah", 'Bagi Hasil Investor'].includes(e.kategori))
-      .reduce((sum, e) => sum + Number(e.jumlah), 0);
-    const cumulativeOtherInc = incomes
-      .filter(i => i.kategori !== 'Modal Awal' && !['Alokasi Investasi', 'Alokasi Sedekah', "Ka'bah"].includes(i.kategori))
-      .reduce((sum, i) => sum + Number(i.jumlah), 0);
-    const cumulativeNetProfit = (cumulativeRevenue - cumulativeCogs - cumulativeOpex + cumulativeOtherInc);
-
-    // Check if already closed by searching the unfiltered expenses list
-    const isAlreadyClosed = expenses.some(e => e.tanggal.startsWith(selectedClosingMonth) && e.kategori === 'Bagi Hasil Investor');
-    const finalProfit = closingMode === 'kumulatif' ? cumulativeNetProfit : mNetProfit;
-
-    // Helper to round to the nearest Rp 1.000
-    const roundTo1000 = (num) => Math.round(num / 1000) * 1000;
-
-    // Split buckets: round distributed ones to nearest Rp 1.000
-    const alokasiSedekah = roundTo1000(finalProfit * 0.10);
-    const alokasiSelfDev = roundTo1000(finalProfit * 0.10);
-    const alokasiDividen = roundTo1000(finalProfit * 0.40);
-    // Investasi (virtual ledger) acts as the balancer to absorb any rounding differences
-    const alokasiInvestasi = finalProfit - alokasiSedekah - alokasiSelfDev - alokasiDividen;
-
-    // Calculate rounded individual investor dividends (rounded to nearest Rp 1.000)
-    let allocatedDividends = 0;
-    const roundedInvestorDividends = investors.map((inv, index) => {
-      let amount = 0;
-      if (index === investors.length - 1) {
-        amount = alokasiDividen - allocatedDividends;
-      } else {
-        amount = roundTo1000(alokasiDividen * (Number(inv.persentase) / 100));
-        allocatedDividends += amount;
-      }
-      return {
-        id: inv.id,
-        nama: inv.nama,
-        persentase: inv.persentase,
-        jumlah: amount
-      };
-    });
-
-    return { 
-      mNetProfit, cumulativeNetProfit, isAlreadyClosed, finalProfit,
-      alokasiInvestasi, alokasiSedekah, alokasiSelfDev, alokasiDividen,
-      roundedInvestorDividends
-    };
-  }, [selectedClosingMonth, sales, expenses, incomes, products, closingMode, investors]);
+  // TUTUP BUKU CALCULATIONS (40-10-10-40, dibulatkan ke Rp 1.000)
+  const closingData = useMemo(
+    () => calcClosing({ month: selectedClosingMonth, mode: closingMode, sales, expenses, incomes, products, investors }),
+    [selectedClosingMonth, sales, expenses, incomes, products, closingMode, investors]
+  );
 
   const handleTutupBuku = async () => {
-    if (closingData.isAlreadyClosed) return toast.error('Bulan ini sudah pernah ditutup buku!');
-    if (closingData.finalProfit <= 0) return toast.error('Laba bersih nol atau minus.');
-
-    const accountId = selectedSourceAccountId;
-    if (!accountId) return toast.error('Pilih rekening sumber untuk memotong dana.');
+    if (closingData.blockReason) return toast.error(closingData.blockReason);
+    if (!selectedSourceAccountId) return toast.error('Pilih rekening sumber untuk memotong dana.');
 
     try {
       setProcessing(true);
-      // Get the last day of the selected closing month
-      const [year, month] = selectedClosingMonth.split('-').map(Number);
-      const lastDay = new Date(year, month, 0).getDate();
-      const targetDate = `${selectedClosingMonth}-${String(lastDay).padStart(2, '0')}`;
-
-      // 1. Ensure virtual accounts exist and get their IDs
-      const virtualNames = ['Kantong Investasi', 'Kantong Sedekah', 'Kantong Ka\'bah'];
-      const virtualIds = {};
-      for (const name of virtualNames) {
-        const found = accounts.find(a => a.nama_rekening === name);
-        if (found) {
-          virtualIds[name] = found.id;
-        } else {
-          // If not in state, try querying just in case
-          const { data: existing } = await supabase.from('kabung_accounts').select('id').eq('nama_rekening', name).maybeSingle();
-          if (existing) {
-            virtualIds[name] = existing.id;
-          } else {
-            const { data: created, error: createErr } = await supabase
-              .from('kabung_accounts')
-              .insert([{ nama_rekening: name, saldo_awal: 0 }])
-              .select().single();
-            if (createErr) throw createErr;
-            virtualIds[name] = created.id;
-          }
-        }
-      }
-
-      // 2. Prepare expense records (Deduct from main source account)
-      const records = [
-        { tanggal: targetDate, kategori: 'Alokasi Investasi', nama_pengeluaran: `Dana Investasi (${selectedClosingMonth})`, jumlah: closingData.alokasiInvestasi, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (40%)' },
-        { tanggal: targetDate, kategori: 'Alokasi Sedekah', nama_pengeluaran: `Dana Sedekah (${selectedClosingMonth})`, jumlah: closingData.alokasiSedekah, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (10%)' },
-        { tanggal: targetDate, kategori: 'Ka\'bah', nama_pengeluaran: `Dana Ka'bah (${selectedClosingMonth})`, jumlah: closingData.alokasiSelfDev, rekening_id: accountId, catatan: 'Otomatis Tutup Buku (10%)' },
-      ];
-
-      const dividendRecords = closingData.roundedInvestorDividends.map(invDiv => ({
-        tanggal: targetDate,
-        kategori: 'Bagi Hasil Investor',
-        nama_pengeluaran: `Bagi Hasil ${selectedClosingMonth}: ${invDiv.nama}`,
-        jumlah: invDiv.jumlah,
-        rekening_id: accountId,
-        catatan: `Tutup Buku ${selectedClosingMonth}. Porsi 40% dari total laba.`
-      }));
-
-      // 3. Prepare income records (Deposit into virtual pocket accounts)
-      const incomeRecords = [
-        { tanggal: targetDate, kategori: 'Alokasi Investasi', nama_pemasukan: `Setoran Alokasi Investasi (${selectedClosingMonth})`, jumlah: closingData.alokasiInvestasi, rekening_id: virtualIds['Kantong Investasi'], catatan: 'Otomatis Tutup Buku (40%)' },
-        { tanggal: targetDate, kategori: 'Alokasi Sedekah', nama_pemasukan: `Setoran Alokasi Sedekah (${selectedClosingMonth})`, jumlah: closingData.alokasiSedekah, rekening_id: virtualIds['Kantong Sedekah'], catatan: 'Otomatis Tutup Buku (10%)' },
-        { tanggal: targetDate, kategori: 'Ka\'bah', nama_pemasukan: `Setoran Alokasi Ka'bah (${selectedClosingMonth})`, jumlah: closingData.alokasiSelfDev, rekening_id: virtualIds['Kantong Ka\'bah'], catatan: 'Otomatis Tutup Buku (10%)' },
-      ];
-
-      // Execute all inserts
-      const { error: expError } = await supabase.from('kabung_expenses').insert([...records, ...dividendRecords]);
-      if (expError) throw expError;
-
-      const { error: incError } = await supabase.from('kabung_incomes').insert(incomeRecords);
-      if (incError) throw incError;
+      const { error } = await supabase.rpc('close_kabung_month', {
+        p_month: selectedClosingMonth,
+        p_source: selectedSourceAccountId,
+        p_investasi: closingData.alokasiInvestasi,
+        p_sedekah: closingData.alokasiSedekah,
+        p_kabah: closingData.alokasiSelfDev,
+        p_dividends: closingData.roundedInvestorDividends.map(({ nama, jumlah }) => ({ nama, jumlah }))
+      });
+      if (error) throw error;
 
       toast.success(`Tutup buku berhasil! Seluruh alokasi telah dicatat ke Kantong Dana.`);
       setIsConfirmModalOpen(false);
@@ -304,43 +147,16 @@ export default function AdminReports() {
   };
 
   // NERACA CALCULATIONS
-  const neraca = useMemo(() => {
-    const cashBank = accounts.reduce((sum, acc) => {
-      let balance = Number(acc.saldo_awal) || 0;
-      sales.filter(s => s.status_pembayaran === 'Sudah bayar' && s.rekening_id === acc.id).forEach(s => balance += Number(s.total_penjualan));
-      incomes.filter(i => i.rekening_id === acc.id).forEach(i => balance += Number(i.jumlah));
-      purchases.filter(p => p.rekening_id === acc.id).forEach(p => balance -= Number(p.harga_beli_total));
-      expenses.filter(e => e.rekening_id === acc.id).forEach(e => balance -= Number(e.jumlah));
-      mutations.filter(m => m.dari_rekening_id === acc.id).forEach(m => balance -= Number(m.jumlah));
-      mutations.filter(m => m.ke_rekening_id === acc.id).forEach(m => balance += Number(m.jumlah));
-      return sum + balance;
-    }, 0);
-    const inventoryValue = products.reduce((sum, p) => sum + (Number(p.stok) * Number(p.harga_modal)), 0);
-    const totalPurchasesValue = purchases.reduce((sum, p) => sum + Number(p.harga_beli_total), 0);
-    const cumulativeCogs = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => {
-      const product = products.find(p => p.id === s.produk_id);
-      return sum + ((product ? Number(product.harga_modal) : 0) * Number(s.jumlah));
-    }, 0);
-    const goodsInTransit = Math.max(0, totalPurchasesValue - cumulativeCogs - inventoryValue);
-    const totalAssets = cashBank + inventoryValue + goodsInTransit;
-
-    const totalCapital = investors.reduce((sum, inv) => sum + Number(inv.modal), 0);
-    const cumulativeRevenue = sales.filter(s => s.status_pembayaran === 'Sudah bayar').reduce((sum, s) => sum + Number(s.total_penjualan), 0);
-    const cumulativeOpex = expenses.reduce((sum, e) => sum + Number(e.jumlah), 0);
-    const cumulativeOtherInc = incomes.filter(i => i.kategori !== 'Modal Awal').reduce((sum, i) => sum + Number(i.jumlah), 0);
-    const retainedEarnings = cumulativeRevenue - cumulativeCogs - cumulativeOpex + cumulativeOtherInc;
-
-    return { cashBank, inventoryValue, goodsInTransit, totalAssets, totalCapital, retainedEarnings, totalEquity: totalCapital + retainedEarnings };
-  }, [accounts, products, sales, incomes, purchases, expenses, investors, mutations]);
+  const neraca = useMemo(
+    () => calcBalanceSheet({ accounts, products, sales, incomes, purchases, expenses, mutations }),
+    [accounts, products, sales, incomes, purchases, expenses, mutations]
+  );
 
   // ARUS KAS
-  const cashflow = useMemo(() => {
-    const opIn = filteredSales.reduce((sum, s) => sum + Number(s.total_penjualan), 0) + filteredIncomes.filter(i => i.kategori !== 'Modal Awal').reduce((sum, i) => sum + Number(i.jumlah), 0);
-    const opOut = filteredExpenses.reduce((sum, e) => sum + Number(e.jumlah), 0) + filteredPurchases.reduce((sum, p) => sum + Number(p.harga_beli_total), 0);
-    const financing = filteredIncomes.filter(i => i.kategori === 'Modal Awal').reduce((sum, i) => sum + Number(i.jumlah), 0) || (filterPeriod === 'Semua' ? investors.reduce((sum, inv) => sum + Number(inv.modal), 0) : 0);
-    const beginningBalance = accounts.reduce((sum, acc) => sum + (Number(acc.saldo_awal) || 0), 0);
-    return { opIn, opOut, operational: opIn - opOut, financing, netChange: opIn - opOut + financing, beginningBalance };
-  }, [filteredSales, filteredIncomes, filteredExpenses, filteredPurchases, investors, accounts, filterPeriod]);
+  const cashflow = useMemo(
+    () => calcCashflow({ sales: filteredSales, incomes: filteredIncomes, expenses: filteredExpenses, purchases: filteredPurchases, accounts }),
+    [filteredSales, filteredIncomes, filteredExpenses, filteredPurchases, accounts]
+  );
 
   if (loading) return <div className="h-[60vh] flex flex-col items-center justify-center"><Loader2 className="w-12 h-12 text-brand-gold animate-spin mb-4" /><p className="text-brand-brown/40 font-bold uppercase tracking-widest text-xs">Loading...</p></div>;
 
@@ -405,7 +221,7 @@ export default function AdminReports() {
           <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-brand-brown/5">
             <h3 className="text-xl font-black text-brand-brown mb-10 flex items-center gap-3"><Briefcase className="w-6 h-6 text-brand-gold" /> Pasiva (Equity)</h3>
             <div className="space-y-6">
-              <div className="flex justify-between items-center"><span className="text-sm font-bold text-brand-brown/60 uppercase tracking-widest">Modal Investor</span><span className="text-lg font-black text-brand-brown">{formatRupiah(neraca.totalCapital)}</span></div>
+              <div className="flex justify-between items-center"><span className="text-sm font-bold text-brand-brown/60 uppercase tracking-widest">Modal & Pendanaan</span><span className="text-lg font-black text-brand-brown">{formatRupiah(neraca.totalCapital)}</span></div>
               <div className="flex justify-between items-center pb-6 border-b border-brand-brown/5"><span className="text-sm font-bold text-brand-brown/60 uppercase tracking-widest">Laba Ditahan</span><span className="text-lg font-black text-emerald-600">{formatRupiah(neraca.retainedEarnings)}</span></div>
               <div className="flex justify-between items-center pt-4 bg-brand-brown text-white p-6 rounded-2xl shadow-xl"><span className="text-sm font-black uppercase tracking-widest opacity-60">Total Pasiva</span><span className="text-2xl font-black">{formatRupiah(neraca.totalEquity)}</span></div>
             </div>
@@ -419,7 +235,7 @@ export default function AdminReports() {
           <h3 className="text-xl font-black text-brand-brown mb-12 flex items-center gap-3"><Wallet className="w-6 h-6 text-brand-gold" /> Laporan Arus Kas</h3>
           <div className="space-y-10 max-w-3xl">
             <div><h4 className="text-xs font-black text-brand-gold uppercase tracking-[0.3em] mb-6">Aktivitas Operasional</h4><div className="space-y-4 px-6 border-l-2 border-brand-brown/5"><div className="flex justify-between"><span className="text-sm font-bold text-brand-brown/60">Penerimaan Pelanggan</span><span className="text-sm font-black text-emerald-600">+{formatRupiah(cashflow.opIn)}</span></div><div className="flex justify-between"><span className="text-sm font-bold text-brand-brown/60">Pengeluaran Operasional</span><span className="text-sm font-black text-rose-500">-({formatRupiah(cashflow.opOut)})</span></div></div></div>
-            <div><h4 className="text-xs font-black text-brand-gold uppercase tracking-[0.3em] mb-6">Aktivitas Pendanaan</h4><div className="space-y-4 px-6 border-l-2 border-brand-brown/5"><div className="flex justify-between"><span className="text-sm font-bold text-brand-brown/60">Modal Investor</span><span className="text-sm font-black text-emerald-600">+{formatRupiah(cashflow.financing)}</span></div></div></div>
+            <div><h4 className="text-xs font-black text-brand-gold uppercase tracking-[0.3em] mb-6">Aktivitas Pendanaan</h4><div className="space-y-4 px-6 border-l-2 border-brand-brown/5"><div className="flex justify-between"><span className="text-sm font-bold text-brand-brown/60">Modal dikurangi Bagi Hasil</span><span className="text-sm font-black text-emerald-600">{formatRupiah(cashflow.financing)}</span></div></div></div>
             <div className="pt-10 border-t-2 border-brand-brown/10 space-y-4">
               <div className="flex justify-between px-6 font-bold"><span className="text-brand-brown/40">Saldo Awal</span><span>{formatRupiah(cashflow.beginningBalance)}</span></div>
               <div className="flex justify-between p-8 bg-brand-gold rounded-3xl text-brand-brown shadow-xl"><div><span className="text-[10px] font-black uppercase opacity-60">Saldo Akhir</span><h4 className="text-4xl font-black tracking-tighter mt-1">{formatRupiah(cashflow.beginningBalance + cashflow.netChange)}</h4></div><Wallet className="w-12 h-12 opacity-30" /></div>
@@ -439,7 +255,7 @@ export default function AdminReports() {
 
               <div className="flex gap-4 mb-10">
                 <button onClick={() => setClosingMode('bulanan')} className={`flex-1 p-5 rounded-3xl border transition-all text-left ${closingMode === 'bulanan' ? 'bg-brand-brown text-white border-brand-brown shadow-xl' : 'bg-white text-brand-brown/60 border-brand-brown/10'}`}><p className="text-[9px] font-black uppercase opacity-60">Mode</p><p className="font-bold">Bulan Ini</p><p className="text-xs mt-1">{formatRupiah(closingData.mNetProfit)}</p></button>
-                <button onClick={() => setClosingMode('kumulatif')} className={`flex-1 p-5 rounded-3xl border transition-all text-left ${closingMode === 'kumulatif' ? 'bg-brand-gold text-brand-brown border-brand-gold shadow-xl' : 'bg-white text-brand-brown/60 border-brand-brown/10'}`}><p className="text-[9px] font-black uppercase opacity-60">Mode</p><p className="font-bold">Akumulatif</p><p className="text-xs mt-1">{formatRupiah(closingData.cumulativeNetProfit)}</p></button>
+                <button onClick={() => setClosingMode('kumulatif')} className={`flex-1 p-5 rounded-3xl border transition-all text-left ${closingMode === 'kumulatif' ? 'bg-brand-gold text-brand-brown border-brand-gold shadow-xl' : 'bg-white text-brand-brown/60 border-brand-brown/10'}`}><p className="text-[9px] font-black uppercase opacity-60">Mode</p><p className="font-bold">Akumulatif (belum dibagi)</p><p className="text-xs mt-1">{formatRupiah(closingData.unallocatedProfit)}</p></button>
               </div>
 
               {closingData.isAlreadyClosed && (
@@ -485,7 +301,13 @@ export default function AdminReports() {
                     </div>
                   </div>
 
-                  {!closingData.isAlreadyClosed && (
+                  {!closingData.isAlreadyClosed && closingData.blockReason && (
+                    <div className="p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl flex items-start gap-3 text-xs font-bold">
+                      <AlertCircle className="w-5 h-5 shrink-0" /> {closingData.blockReason}
+                    </div>
+                  )}
+
+                  {!closingData.blockReason && (
                     <button onClick={() => setIsConfirmModalOpen(true)} disabled={processing} className="w-full py-6 bg-brand-brown text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-brand-gold hover:text-brand-brown transition-all flex items-center justify-center gap-4 disabled:opacity-50">
                       <Lock className="w-5 h-5" /> Proses Tutup Buku & Alokasi Dana
                     </button>
