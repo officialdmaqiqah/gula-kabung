@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, CheckCircle2, Clock, AlertCircle, Loader2, Package, Calendar, User, ArrowRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useConfirm } from '../../components/admin/ConfirmDialog';
 import { fetchAll } from '../../lib/fetchAll';
 import { todayWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 export default function AdminReceiving() {
+  const confirmAction = useConfirm();
   const [pendingOrders, setPendingOrders] = useState([]);
   const [receivingHistory, setReceivingHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +88,14 @@ export default function AdminReceiving() {
       
       const remaining = selectedOrder.jumlah_beli - (selectedOrder.jumlah_diterima || 0);
       if (formData.jumlahTerima > remaining) {
-        if (!window.confirm(`Jumlah yang Anda masukkan (${formData.jumlahTerima}) melebihi sisa pesanan (${remaining}). Tetap simpan?`)) {
+        const confirmed = await confirmAction({
+          tone: 'warning',
+          title: 'Jumlah melebihi sisa pesanan',
+          description: 'Stok akan bertambah sesuai jumlah yang dimasukkan.',
+          details: [['Produk', selectedOrder.nama_produk], ['Sisa pesanan', `${remaining} pcs`], ['Jumlah diterima', `${formData.jumlahTerima} pcs`]],
+          confirmLabel: 'Tetap Simpan'
+        });
+        if (!confirmed) {
           setSubmitting(false);
           return;
         }

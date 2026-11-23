@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Edit, Trash2, Download, ArrowUpRight, ArrowDownRight, Wallet, Loader2, ArrowRightLeft, Filter, X, Calendar } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useConfirm } from '../../components/admin/ConfirmDialog';
 import { fetchAll } from '../../lib/fetchAll';
 import { todayWIB, currentMonthWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 
 export default function AdminFinances() {
+  const confirmAction = useConfirm();
   const [sales, setSales] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -127,8 +129,18 @@ export default function AdminFinances() {
     } catch (error) { alert('Gagal: ' + error.message); } finally { setSubmitting(false); }
   };
 
-  const deleteRow = async (table, id) => {
-    if (!window.confirm('Hapus?')) return;
+  const deleteRow = async (table, id, label, row) => {
+    const confirmed = await confirmAction({
+      title: `Hapus ${label}?`,
+      description: 'Saldo rekening dan laporan akan ikut berubah.',
+      details: [
+        ['Keterangan', row?.nama_pengeluaran || row?.nama_pemasukan],
+        ['Kategori', row?.kategori],
+        ['Jumlah', row ? formatRupiah(row.jumlah) : ''],
+        ['Tanggal', row?.tanggal]
+      ]
+    });
+    if (!confirmed) return;
     try {
       setLoading(true);
       const { error } = await supabase.from(table).delete().eq('id', id);
@@ -140,8 +152,8 @@ export default function AdminFinances() {
       setLoading(false);
     }
   };
-  const handleDeleteExpense = (id) => deleteRow('kabung_expenses', id);
-  const handleDeleteIncome = (id) => deleteRow('kabung_incomes', id);
+  const handleDeleteExpense = (id) => deleteRow('kabung_expenses', id, 'pengeluaran', expenses.find(e => e.id === id));
+  const handleDeleteIncome = (id) => deleteRow('kabung_incomes', id, 'pemasukan', incomes.find(i => i.id === id));
 
   // --- UNIFIED TRANSACTIONS LIST ---
   const allTransactions = useMemo(() => {

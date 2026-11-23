@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Edit, Trash2, Search, Filter, Truck, Loader2, CheckCircle2, Clock, AlertCircle, Receipt } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useConfirm } from '../../components/admin/ConfirmDialog';
 import { fetchAll } from '../../lib/fetchAll';
 import { todayWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 export default function AdminPurchases() {
+  const confirmAction = useConfirm();
   const [purchases, setPurchases] = useState([]);
   const [products, setProducts] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -181,7 +183,18 @@ export default function AdminPurchases() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Yakin ingin menghapus data pesanan ini?')) {
+    const purchase = purchases.find(p => p.id === id);
+    const confirmed = await confirmAction({
+      title: 'Hapus pesanan stok?',
+      description: 'Stok yang sudah diterima tidak otomatis berkurang.',
+      details: [
+        ['Supplier', purchase?.nama_petani],
+        ['Produk', purchase ? `${purchase.jumlah_beli}x ${purchase.nama_produk}` : ''],
+        ['Total', purchase ? formatRupiah(purchase.harga_beli_total) : ''],
+        ['Tanggal', purchase?.tanggal]
+      ]
+    });
+    if (confirmed) {
       try {
         setLoading(true);
         const { error } = await supabase.from('kabung_purchases').delete().eq('id', id);

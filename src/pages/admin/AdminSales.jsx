@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Edit, Trash2, Search, Filter, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useConfirm } from '../../components/admin/ConfirmDialog';
 import { fetchAll } from '../../lib/fetchAll';
 import { todayWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 export default function AdminSales() {
+  const confirmAction = useConfirm();
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -154,7 +156,21 @@ export default function AdminSales() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Yakin ingin menghapus transaksi ini? Stok produk akan dikembalikan.')) {
+    const sale = sales.find(s => s.id === id);
+    const confirmed = await confirmAction({
+      title: 'Hapus transaksi penjualan?',
+      description: sale?.status_pembayaran === 'Batal'
+        ? 'Transaksi ini sudah Batal, jadi stok tidak berubah.'
+        : 'Stok produk akan dikembalikan.',
+      details: [
+        ['Pembeli', sale?.nama_pembeli],
+        ['Produk', sale ? `${sale.jumlah}x ${sale.nama_produk}` : ''],
+        ['Total', sale ? formatRupiah(sale.total_penjualan) : ''],
+        ['Tanggal', sale?.tanggal],
+        ['Status', sale?.status_pembayaran]
+      ]
+    });
+    if (confirmed) {
       try {
         setLoading(true);
         const { error } = await supabase.rpc('delete_kabung_sale', { p_id: id });

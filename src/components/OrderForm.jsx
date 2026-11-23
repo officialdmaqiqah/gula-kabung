@@ -6,6 +6,16 @@ import { formatRupiah } from '../utils/format';
 import { toast } from 'react-hot-toast';
 import { useStoreWhatsapp } from '../hooks/useStoreWhatsapp';
 
+const fetchRegions = async (path) => {
+  const response = await fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/${path}.json`, {
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!response.ok) throw new Error('Data wilayah tidak tersedia');
+  const data = await response.json();
+  if (!Array.isArray(data) || data.length === 0) throw new Error('Data wilayah kosong');
+  return data;
+};
+
 export default function OrderForm() {
   const { cart, clearCart } = useCart();
   const storeWhatsapp = useStoreWhatsapp();
@@ -16,6 +26,7 @@ export default function OrderForm() {
   const [selectedProvince, setSelectedProvince] = useState({ id: '', name: '' });
   const [selectedRegency, setSelectedRegency] = useState({ id: '', name: '' });
   const [selectedDistrict, setSelectedDistrict] = useState({ id: '', name: '' });
+  const [manualRegion, setManualRegion] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -28,36 +39,36 @@ export default function OrderForm() {
   const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
-    fetch('https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json')
-      .then(response => response.json())
-      .then(data => setProvinces(data));
+    fetchRegions('provinces')
+      .then(data => setProvinces(data))
+      .catch(() => setManualRegion(true));
   }, []);
 
   // Fetch Regencies when Province changes
   useEffect(() => {
-    if (selectedProvince.id) {
-      fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${selectedProvince.id}.json`)
-        .then(response => response.json())
+    if (selectedProvince.id && !manualRegion) {
+      fetchRegions(`regencies/${selectedProvince.id}`)
         .then(data => {
           setRegencies(data);
           setDistricts([]);
           setSelectedRegency({ id: '', name: '' });
           setSelectedDistrict({ id: '', name: '' });
-        });
+        })
+        .catch(() => setManualRegion(true));
     }
-  }, [selectedProvince.id]);
+  }, [selectedProvince.id, manualRegion]);
 
   // Fetch Districts when Regency changes
   useEffect(() => {
-    if (selectedRegency.id) {
-      fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/districts/${selectedRegency.id}.json`)
-        .then(response => response.json())
+    if (selectedRegency.id && !manualRegion) {
+      fetchRegions(`districts/${selectedRegency.id}`)
         .then(data => {
           setDistricts(data);
           setSelectedDistrict({ id: '', name: '' });
-        });
+        })
+        .catch(() => setManualRegion(true));
     }
-  }, [selectedRegency.id]);
+  }, [selectedRegency.id, manualRegion]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -94,7 +105,7 @@ export default function OrderForm() {
     if (validate()) {
       try {
         setSubmitting(true);
-        const fullAddress = `${formData.address}, Kec. ${selectedDistrict.name}, ${selectedRegency.name}, Prov. ${selectedProvince.name}`;
+        const fullAddress = `${formData.address}, Kec. ${selectedDistrict.name.trim()}, ${selectedRegency.name.trim()}, Prov. ${selectedProvince.name.trim()}`;
 
         // Server menentukan harga dan mengurangi stok dalam satu transaksi
         const { data: order, error } = await supabase.rpc('create_kabung_order', {
@@ -129,6 +140,12 @@ export default function OrderForm() {
         setSubmitting(false);
       }
     }
+  };
+
+  const handleManualRegion = (setter, errorName) => (e) => {
+    const name = e.target.value;
+    setter({ id: name.trim() ? 'manual' : '', name });
+    if (errors[errorName]) setErrors((prev) => ({ ...prev, [errorName]: '' }));
   };
 
   const inputClass = (name) => `
@@ -175,6 +192,24 @@ export default function OrderForm() {
           </div>
         </div>
 
+        {manualRegion ? (
+        <div>
+          <p className="mb-4 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-sm font-medium text-amber-700">Daftar wilayah sedang tidak tersedia. Silakan ketik wilayah Anda.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              ['Provinsi', 'province', selectedProvince, setSelectedProvince],
+              ['Kota/Kab', 'regency', selectedRegency, setSelectedRegency],
+              ['Kecamatan', 'district', selectedDistrict, setSelectedDistrict]
+            ].map(([label, errorName, selected, setter]) => (
+              <div key={errorName} className="relative group">
+                <label htmlFor={`manual-${errorName}`} className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-brown/60 mb-3 block">{label} *</label>
+                <input id={`manual-${errorName}`} type="text" maxLength={60} value={selected.name} onChange={handleManualRegion(setter, errorName)} className={inputClass(errorName)} placeholder={`Ketik ${label.toLowerCase()}...`} />
+                {errors[errorName] && <p className="text-rose-500 text-[9px] font-black uppercase tracking-widest mt-2">{errors[errorName]}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="relative group">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-brown/60 mb-3 block">Provinsi *</label>
@@ -198,6 +233,7 @@ export default function OrderForm() {
             </select>
           </div>
         </div>
+        )}
 
         <div className="relative group">
           <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-brand-brown/60 mb-3"><MapPin className="w-3.5 h-3.5" /> Detail Alamat *</label>

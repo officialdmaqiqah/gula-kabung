@@ -18,6 +18,7 @@ import {
   ClipboardList
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { ConfirmProvider } from './ConfirmDialog';
 
 export default function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -144,7 +145,9 @@ export default function AdminLayout() {
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto px-6 lg:px-10 py-4 lg:py-6 bg-brand-cream/30">
           <div className="max-w-6xl mx-auto w-full">
-            <Outlet />
+            <ConfirmProvider>
+              <Outlet />
+            </ConfirmProvider>
           </div>
         </main>
       </div>

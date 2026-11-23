@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, ArrowRightLeft, Loader2, Calendar, Wallet, ArrowRight, Save } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useConfirm } from '../../components/admin/ConfirmDialog';
 import { fetchAll } from '../../lib/fetchAll';
 import { todayWIB, currentMonthWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
 export default function AdminMutations() {
+  const confirmAction = useConfirm();
   const [mutations, setMutations] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +98,19 @@ export default function AdminMutations() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Yakin ingin menghapus catatan mutasi ini?')) return;
+    const mutation = mutations.find(m => m.id === id);
+    const accountName = (accountId) => accounts.find(a => a.id === accountId)?.nama_rekening;
+    const confirmed = await confirmAction({
+      title: 'Hapus catatan mutasi?',
+      description: 'Saldo kedua rekening akan ikut berubah.',
+      details: [
+        ['Dari', accountName(mutation?.dari_rekening_id)],
+        ['Ke', accountName(mutation?.ke_rekening_id)],
+        ['Jumlah', mutation ? formatRupiah(mutation.jumlah) : ''],
+        ['Tanggal', mutation?.tanggal]
+      ]
+    });
+    if (!confirmed) return;
     
     try {
       setLoading(true);

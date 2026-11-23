@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useConfirm } from '../../components/admin/ConfirmDialog';
 import { fetchAll } from '../../lib/fetchAll';
 import { todayWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
@@ -8,6 +9,7 @@ import { Plus, Edit, Trash2, Users, CreditCard, Truck, Settings, Loader2, Save }
 import { toast } from 'react-hot-toast';
 
 export default function AdminSettings() {
+  const confirmAction = useConfirm();
   const [activeTab, setActiveTab] = useState('investor');
 
   const [investors, setInvestors] = useState([]);
@@ -180,7 +182,30 @@ export default function AdminSettings() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Yakin ingin menghapus data ini?')) return;
+    let dialog;
+    if (activeTab === 'investor') {
+      const investor = investors.find(i => i.id === id);
+      dialog = {
+        title: 'Hapus investor?',
+        description: 'Catatan setoran modal otomatis milik investor ini juga akan dihapus.',
+        details: [['Nama', investor?.nama], ['Modal', investor ? formatRupiah(investor.modal) : ''], ['Saham', investor ? `${investor.persentase}%` : '']]
+      };
+    } else if (activeTab === 'account') {
+      const account = accounts.find(a => a.id === id);
+      dialog = {
+        title: 'Hapus rekening?',
+        description: 'Rekening yang sudah punya transaksi mungkin tidak bisa dihapus.',
+        details: [['Rekening', account?.nama_rekening], ['Nomor', account?.nomor_rekening], ['Atas nama', account?.atas_nama]]
+      };
+    } else {
+      const supplier = suppliers.find(s => s.id === id);
+      dialog = {
+        title: 'Hapus supplier?',
+        description: 'Data supplier ini akan dihapus.',
+        details: [['Nama', supplier?.nama_petani], ['Kontak', supplier?.kontak]]
+      };
+    }
+    if (!(await confirmAction(dialog))) return;
     
     try {
       setLoading(true);
