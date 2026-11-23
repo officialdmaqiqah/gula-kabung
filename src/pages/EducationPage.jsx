@@ -1,11 +1,10 @@
 import React from 'react';
 import { BookOpen, Zap, Droplets, Heart } from 'lucide-react';
 
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useStoreWhatsapp } from '../hooks/useStoreWhatsapp';
 
 export default function EducationPage() {
-  const [siteSettings] = useLocalStorage('kabungmart_settings', { whatsapp: '6281234567890' });
-  const SELLER_NUMBER = siteSettings.whatsapp || '6281234567890';
+  const storeWhatsapp = useStoreWhatsapp();
 
   return (
     <div className="min-h-screen bg-brand-cream font-sans pt-40 pb-32 overflow-x-hidden">
@@ -69,7 +68,7 @@ export default function EducationPage() {
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-brand-gold/10 via-transparent to-transparent pointer-events-none" />
           <h3 className="text-2xl font-heading font-black mb-6">Ingin Tahu Lebih Lanjut?</h3>
           <p className="text-white/40 mb-8 font-medium">Tim kami siap berdiskusi tentang detail teknis atau profil rasa produk kami.</p>
-          <a href={`https://wa.me/${SELLER_NUMBER}`} className="inline-flex h-14 px-10 bg-brand-gold text-brand-brown rounded-2xl text-[10px] font-black uppercase tracking-widest items-center hover:scale-105 transition-all shadow-2xl shadow-brand-gold/20">Tanya Admin</a>
+          <a href={storeWhatsapp ? `https://wa.me/${storeWhatsapp}` : undefined} className="inline-flex h-14 px-10 bg-brand-gold text-brand-brown rounded-2xl text-[10px] font-black uppercase tracking-widest items-center hover:scale-105 transition-all shadow-2xl shadow-brand-gold/20">Tanya Admin</a>
         </div>
 
       </div>

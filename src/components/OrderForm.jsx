@@ -4,10 +4,11 @@ import { useCart } from '../context/CartContext';
 import { supabase } from '../lib/supabase';
 import { formatRupiah } from '../utils/format';
 import { toast } from 'react-hot-toast';
+import { useStoreWhatsapp } from '../hooks/useStoreWhatsapp';
 
 export default function OrderForm() {
   const { cart, clearCart } = useCart();
-  const [siteSettings, setSiteSettings] = useState({ whatsapp: '6281234567890' });
+  const storeWhatsapp = useStoreWhatsapp();
   const [provinces, setProvinces] = useState([]);
   const [regencies, setRegencies] = useState([]);
   const [districts, setDistricts] = useState([]);
@@ -27,20 +28,10 @@ export default function OrderForm() {
   const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
-    fetchSettings();
     fetch('https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json')
       .then(response => response.json())
       .then(data => setProvinces(data));
   }, []);
-
-  const fetchSettings = async () => {
-    try {
-      const { data } = await supabase.from('kabung_settings').select('whatsapp').eq('id', 'main').single();
-      if (data) setSiteSettings(data);
-    } catch (error) {
-      console.error('Error fetching settings:', error.message);
-    }
-  };
 
   // Fetch Regencies when Province changes
   useEffect(() => {
@@ -95,6 +86,10 @@ export default function OrderForm() {
       toast.error('Keranjang belanja Anda masih kosong.');
       return;
     }
+    if (!storeWhatsapp) {
+      toast.error('Nomor WhatsApp toko belum termuat. Coba lagi sebentar.');
+      return;
+    }
 
     if (validate()) {
       try {
@@ -105,6 +100,8 @@ export default function OrderForm() {
         const { data: order, error } = await supabase.rpc('create_kabung_order', {
           p_nama: formData.name,
           p_catatan: formData.notes,
+          p_whatsapp: formData.whatsapp,
+          p_alamat: fullAddress,
           p_items: cart.map(item => ({ id: item.id, quantity: item.quantity }))
         });
         if (error) throw error;
@@ -116,7 +113,7 @@ export default function OrderForm() {
 
         const message = `Halo Gula Kabung Belitung, saya mau order produk premium Anda.\n\nNama: ${formData.name}\nNo. WhatsApp: ${formData.whatsapp}\nAlamat: ${fullAddress}\n\nRincian Pesanan:\n${orderItems}\n\nTotal Pembayaran: ${formatRupiah(order.total)}\nCatatan: ${formData.notes || '-'}`;
 
-        const waUrl = `https://wa.me/${siteSettings.whatsapp}?text=${encodeURIComponent(message)}`;
+        const waUrl = `https://wa.me/${storeWhatsapp}?text=${encodeURIComponent(message)}`;
         
         setIsSuccess(true);
         toast.success('Pesanan berhasil dibuat!');

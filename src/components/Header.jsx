@@ -2,17 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ShoppingCart, Menu, X, Leaf } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useStoreWhatsapp } from '../hooks/useStoreWhatsapp';
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
   const { getCartCount } = useCart();
-  const [siteSettings] = useLocalStorage('kabungmart_settings', { whatsapp: '6281234567890' });
+  const storeWhatsapp = useStoreWhatsapp();
   
   const cartCount = getCartCount();
-  const SELLER_NUMBER = siteSettings.whatsapp || '6281234567890';
 
   const navLinks = [
     { name: 'Beranda', path: '/' },
@@ -126,7 +125,7 @@ export default function Header() {
 
           <div className="mt-16 pt-8 border-t border-white/10 w-full max-w-sm text-center">
             <p className="text-[10px] font-black text-brand-gold uppercase tracking-[0.4em] mb-4">Butuh Bantuan?</p>
-            <a href={`https://wa.me/${SELLER_NUMBER}`} className="text-white/60 hover:text-white font-bold transition-colors">WhatsApp Kami</a>
+            <a href={storeWhatsapp ? `https://wa.me/${storeWhatsapp}` : undefined} className="text-white/60 hover:text-white font-bold transition-colors">WhatsApp Kami</a>
           </div>
         </div>
       </div>

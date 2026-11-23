@@ -3,6 +3,7 @@ import { Leaf, Search, Filter, ShoppingBag, ArrowRight, Grid, List, Loader2, Clo
 import { supabase } from '../lib/supabase';
 import { formatRupiah } from '../utils/format';
 import { useCart } from '../context/CartContext';
+import { useStoreWhatsapp } from '../hooks/useStoreWhatsapp';
 import { toast } from 'react-hot-toast';
 
 export default function CatalogPage() {
@@ -15,7 +16,7 @@ export default function CatalogPage() {
   
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  const [whatsapp, setWhatsapp] = useState('6281234567890');
+  const whatsapp = useStoreWhatsapp();
   const [preorderProduct, setPreorderProduct] = useState(null);
   const [preorderFormData, setPreorderFormData] = useState({
     namaKonsumen: '',
@@ -28,17 +29,7 @@ export default function CatalogPage() {
   
   useEffect(() => {
     fetchProducts();
-    fetchSettings();
   }, []);
-
-  const fetchSettings = async () => {
-    try {
-      const { data } = await supabase.from('kabung_settings').select('whatsapp').eq('id', 'main').single();
-      if (data && data.whatsapp) setWhatsapp(data.whatsapp);
-    } catch (err) {
-      console.error('Error fetching settings:', err);
-    }
-  };
 
   const fetchProducts = async () => {
     try {
@@ -368,6 +359,7 @@ export default function CatalogPage() {
                   e.preventDefault();
                   if (!preorderFormData.namaKonsumen.trim()) return toast.error('Nama wajib diisi!');
                   if (!preorderFormData.whatsapp.trim()) return toast.error('WhatsApp wajib diisi!');
+                  if (!whatsapp) return toast.error('Nomor WhatsApp toko belum termuat. Coba lagi sebentar.');
                   
                   try {
                     setPreorderSubmitting(true);

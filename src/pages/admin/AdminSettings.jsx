@@ -11,7 +11,7 @@ export default function AdminSettings() {
   const [investors, setInvestors] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  const [siteSettings, setSiteSettings] = useState({ hero_image: '', whatsapp: '6281234567890' });
+  const [siteSettings, setSiteSettings] = useState({ hero_image: '', whatsapp: '' });
 
   const [sales, setSales] = useState([]);
   const [purchases, setPurchases] = useState([]);

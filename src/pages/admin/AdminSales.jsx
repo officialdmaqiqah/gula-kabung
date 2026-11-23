@@ -218,6 +218,17 @@ export default function AdminSales() {
                   <td className="px-6 py-4 text-sm text-brand-brown">{sale.tanggal}</td>
                   <td className="px-6 py-4">
                     <div className="font-medium text-brand-brown">{sale.nama_pembeli}</div>
+                    {sale.whatsapp_pembeli && (
+                      <a
+                        href={`https://wa.me/${sale.whatsapp_pembeli.replace(/\D/g, '').replace(/^0/, '62')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs font-bold text-emerald-600 hover:underline"
+                      >
+                        {sale.whatsapp_pembeli}
+                      </a>
+                    )}
+                    {sale.alamat_pembeli && <div className="text-xs text-brand-brown/50 max-w-xs whitespace-normal">{sale.alamat_pembeli}</div>}
                     <div className="text-sm text-brand-brown/50">{sale.jumlah}x {sale.nama_produk}</div>
                   </td>
                   <td className="px-6 py-4">

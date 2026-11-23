@@ -1,12 +1,13 @@
 import React from 'react';
 import { Building2, ShieldCheck, Truck, Users } from 'lucide-react';
 
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useStoreWhatsapp } from '../hooks/useStoreWhatsapp';
 
 export default function B2BPage() {
-  const [siteSettings] = useLocalStorage('kabungmart_settings', { whatsapp: '6281234567890' });
-  const SELLER_NUMBER = siteSettings.whatsapp || '6281234567890';
-  const b2bChatUrl = `https://wa.me/${SELLER_NUMBER}?text=${encodeURIComponent('Halo, saya tertarik untuk kerjasama B2B / Reseller Gula Kabung.')}`;
+  const storeWhatsapp = useStoreWhatsapp();
+  const b2bChatUrl = storeWhatsapp
+    ? `https://wa.me/${storeWhatsapp}?text=${encodeURIComponent('Halo, saya tertarik untuk kerjasama B2B / Reseller Gula Kabung.')}`
+    : undefined;
 
   return (
     <div className="min-h-screen bg-brand-cream font-sans pt-32 pb-24">

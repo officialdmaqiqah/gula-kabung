@@ -6,7 +6,7 @@ import { formatRupiah } from '../utils/format';
 
 export default function LandingPage() {
   const [products, setProducts] = useState([]);
-  const [siteSettings, setSiteSettings] = useState({ hero_image: '', whatsapp: '6281234567890' });
+  const [siteSettings, setSiteSettings] = useState({ hero_image: '', whatsapp: '' });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,8 +37,9 @@ export default function LandingPage() {
     }
   };
 
-  const SELLER_NUMBER = siteSettings.whatsapp || '6281234567890';
-  const chatUrl = `https://wa.me/${SELLER_NUMBER}?text=${encodeURIComponent('Halo, saya ingin bertanya tentang Gula Kabung Belitung.')}`;
+  const chatUrl = siteSettings.whatsapp
+    ? `https://wa.me/${siteSettings.whatsapp}?text=${encodeURIComponent('Halo, saya ingin bertanya tentang Gula Kabung Belitung.')}`
+    : undefined;
 
   const featuredProducts = products.slice(0, 3).map(p => ({
     id: p.id,
