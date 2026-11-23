@@ -85,7 +85,7 @@ export default function AdminLogin() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3 bg-gold-500 hover:bg-gold-600 text-white font-bold rounded-xl transition-colors shadow-sm mt-2 disabled:opacity-50"
+            className="w-full py-3 bg-brand-brown hover:bg-brown-800 text-white font-bold rounded-xl transition-colors shadow-sm mt-2 disabled:opacity-50"
           >
             {submitting ? 'Memproses...' : 'Login'}
           </button>

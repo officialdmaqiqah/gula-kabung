@@ -4,6 +4,28 @@
   --color-brand-brown: #58372b;
   --color-brand-gold: #d4af37;
   --color-brand-cream: #fdfcf9;
+
+  --color-cream: #fdfcf9;
+  --color-brown-50: #f8f4f2;
+  --color-brown-100: #efe6e2;
+  --color-brown-200: #dfcdc5;
+  --color-brown-300: #c8aa9d;
+  --color-brown-400: #a98476;
+  --color-brown-500: #8a6557;
+  --color-brown-600: #704f43;
+  --color-brown-700: #58372b;
+  --color-brown-800: #452b22;
+  --color-brown-900: #33201a;
+  --color-gold-50: #fbf7e9;
+  --color-gold-100: #f6edc9;
+  --color-gold-200: #eddc93;
+  --color-gold-300: #e5cd6c;
+  --color-gold-400: #dcbd4a;
+  --color-gold-500: #d4af37;
+  --color-gold-600: #b08f27;
+  --color-gold-700: #86691b;
+  --color-gold-800: #604b14;
+  --color-gold-900: #43350e;
   
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-heading: 'Outfit', 'Inter', sans-serif;
