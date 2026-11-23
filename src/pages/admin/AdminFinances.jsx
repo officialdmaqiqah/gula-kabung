@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Edit, Trash2, Download, ArrowUpRight, ArrowDownRight, Wallet, Loader2, ArrowRightLeft, Filter, X, Calendar } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
+import { todayWIB, currentMonthWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 
 export default function AdminFinances() {
@@ -19,7 +21,7 @@ export default function AdminFinances() {
   
   // --- FILTERS ---
   const [filterPeriodType, setFilterPeriodType] = useState('Bulan'); // 'Bulan' or 'Semua'
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [filterMonth, setFilterMonth] = useState(currentMonthWIB());
   const [filterType, setFilterType] = useState('Semua');
   const [filterCategory, setFilterCategory] = useState('Semua');
   const [filterAccountId, setFilterAccountId] = useState('Semua');
@@ -47,12 +49,12 @@ export default function AdminFinances() {
         { data: accData },
         { data: mData }
       ] = await Promise.all([
-        supabase.from('kabung_sales').select('*'),
-        supabase.from('kabung_purchases').select('*'),
-        supabase.from('kabung_expenses').select('*'),
-        supabase.from('kabung_incomes').select('*'),
-        supabase.from('kabung_accounts').select('*'),
-        supabase.from('kabung_mutations').select('*')
+        fetchAll(() => supabase.from('kabung_sales').select('*')),
+        fetchAll(() => supabase.from('kabung_purchases').select('*')),
+        fetchAll(() => supabase.from('kabung_expenses').select('*')),
+        fetchAll(() => supabase.from('kabung_incomes').select('*')),
+        fetchAll(() => supabase.from('kabung_accounts').select('*')),
+        fetchAll(() => supabase.from('kabung_mutations').select('*'))
       ]);
 
       setSales(sData || []);
@@ -81,7 +83,7 @@ export default function AdminFinances() {
       setExpenseForm({ tanggal: exp.tanggal, kategori: exp.kategori, namaPengeluaran: exp.nama_pengeluaran, jumlah: exp.jumlah, rekeningId: exp.rekening_id, catatan: exp.catatan || '' });
     } else {
       setEditingId(null);
-      setExpenseForm({ tanggal: new Date().toISOString().split('T')[0], kategori: expenseCategories[0], namaPengeluaran: '', jumlah: 0, rekeningId: accounts.length > 0 ? accounts[0].id : '', catatan: '' });
+      setExpenseForm({ tanggal: todayWIB(), kategori: expenseCategories[0], namaPengeluaran: '', jumlah: 0, rekeningId: accounts.length > 0 ? accounts[0].id : '', catatan: '' });
     }
     setIsExpenseModalOpen(true);
   };
@@ -106,7 +108,7 @@ export default function AdminFinances() {
       setIncomeForm({ tanggal: inc.tanggal, kategori: inc.kategori, namaPemasukan: inc.nama_pemasukan, jumlah: inc.jumlah, rekeningId: inc.rekening_id, catatan: inc.catatan || '' });
     } else {
       setEditingId(null);
-      setIncomeForm({ tanggal: new Date().toISOString().split('T')[0], kategori: incomeCategories[0], namaPemasukan: '', jumlah: 0, rekeningId: accounts.length > 0 ? accounts[0].id : '', catatan: '' });
+      setIncomeForm({ tanggal: todayWIB(), kategori: incomeCategories[0], namaPemasukan: '', jumlah: 0, rekeningId: accounts.length > 0 ? accounts[0].id : '', catatan: '' });
     }
     setIsIncomeModalOpen(true);
   };

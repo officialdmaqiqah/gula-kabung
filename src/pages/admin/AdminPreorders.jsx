@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, Loader2, MessageSquare, Trash2, Check, X, Clock, HelpCircle, Plus } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
+import { todayWIB } from '../../utils/date';
 import { toast } from 'react-hot-toast';
 
 export default function AdminPreorders() {
@@ -32,10 +34,10 @@ export default function AdminPreorders() {
 
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await fetchAll(() => supabase
         .from('kabung_products')
         .select('id, nama_produk')
-        .order('nama_produk', { ascending: true });
+        .order('nama_produk', { ascending: true }));
       if (error) throw error;
       setProducts(data || []);
     } catch (err) {
@@ -46,10 +48,10 @@ export default function AdminPreorders() {
   const fetchPreorders = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await fetchAll(() => supabase
         .from('kabung_preorders')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }));
 
       if (error) throw error;
       setPreorders(data || []);
@@ -350,6 +352,7 @@ export default function AdminPreorders() {
                 const selectedProd = products.find(p => p.id === formData.produkId);
                 const { error } = await supabase.from('kabung_preorders').insert([
                   {
+                    tanggal: todayWIB(),
                     nama_konsumen: formData.namaKonsumen,
                     whatsapp: formData.whatsapp,
                     produk_id: formData.produkId,
@@ -426,7 +429,7 @@ export default function AdminPreorders() {
                   <input 
                     readOnly 
                     type="text" 
-                    value={new Date().toISOString().split('T')[0]}
+                    value={todayWIB()}
                     className="w-full px-4 py-3.5 bg-brand-brown/5 border border-brand-brown/10 rounded-xl outline-none text-brand-brown/50 font-bold text-xs cursor-not-allowed"
                   />
                 </div>

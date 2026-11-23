@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
+import { todayWIB } from '../../utils/date';
 import { calcProfit, isOtherIncome } from '../../utils/finance';
 import { formatRupiah } from '../../utils/format';
 import { 
@@ -33,8 +35,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   // Safe Date Handling
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
+  const today = todayWIB();
   const thisMonth = today.substring(0, 7);
 
   useEffect(() => {
@@ -46,7 +47,7 @@ export default function AdminDashboard() {
         
         const fetchTable = async (tableName) => {
           try {
-            const { data, error } = await supabase.from(tableName).select('*');
+            const { data, error } = await fetchAll(() => supabase.from(tableName).select('*'));
             if (error) return [];
             return data || [];
           } catch (e) {

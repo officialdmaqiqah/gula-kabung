@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, CheckCircle2, Clock, AlertCircle, Loader2, Package, Calendar, User, ArrowRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
+import { todayWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
@@ -13,7 +15,7 @@ export default function AdminReceiving() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   
   const [formData, setFormData] = useState({
-    tanggalTerima: new Date().toISOString().split('T')[0],
+    tanggalTerima: todayWIB(),
     jumlahTerima: 0,
     penerima: '',
     catatan: ''
@@ -28,11 +30,11 @@ export default function AdminReceiving() {
       setLoading(true);
       
       // 1. Fetch Orders that are not fully received
-      const { data: orders, error: ordersError } = await supabase
+      const { data: orders, error: ordersError } = await fetchAll(() => supabase
         .from('kabung_purchases')
         .select('*')
         .neq('status_penerimaan', 'Selesai')
-        .order('tanggal', { ascending: false });
+        .order('tanggal', { ascending: false }));
 
       if (ordersError) throw ordersError;
 
@@ -66,7 +68,7 @@ export default function AdminReceiving() {
     setSelectedOrder(order);
     const remaining = order.jumlah_beli - (order.jumlah_diterima || 0);
     setFormData({
-      tanggalTerima: new Date().toISOString().split('T')[0],
+      tanggalTerima: todayWIB(),
       jumlahTerima: remaining,
       penerima: '',
       catatan: ''

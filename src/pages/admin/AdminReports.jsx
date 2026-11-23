@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
+import { todayWIB, currentMonthWIB, startOfWeekWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 import { FileText, Calendar, Download, Loader2, PieChart, TrendingUp, Wallet, ShieldCheck, Briefcase, Lock, CheckCircle2, AlertCircle, Clock, ArrowRight, Heart, Zap, Gem } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -19,12 +21,12 @@ export default function AdminReports() {
   const [processing, setProcessing] = useState(false);
   
   const [filterPeriod, setFilterPeriod] = useState('Bulan ini');
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [filterMonth, setFilterMonth] = useState(currentMonthWIB());
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
   // Tutup Buku States
-  const [selectedClosingMonth, setSelectedClosingMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [selectedClosingMonth, setSelectedClosingMonth] = useState(currentMonthWIB());
   const [closingMode, setClosingMode] = useState('bulanan'); 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [selectedSourceAccountId, setSelectedSourceAccountId] = useState(''); 
@@ -37,14 +39,14 @@ export default function AdminReports() {
     try {
       setLoading(true);
       const results = await Promise.all([
-        supabase.from('kabung_sales').select('*'),
-        supabase.from('kabung_purchases').select('*'),
-        supabase.from('kabung_expenses').select('*'),
-        supabase.from('kabung_incomes').select('*'),
-        supabase.from('kabung_products').select('*'),
-        supabase.from('kabung_accounts').select('*'),
-        supabase.from('kabung_investors').select('*'),
-        supabase.from('kabung_mutations').select('*')
+        fetchAll(() => supabase.from('kabung_sales').select('*')),
+        fetchAll(() => supabase.from('kabung_purchases').select('*')),
+        fetchAll(() => supabase.from('kabung_expenses').select('*')),
+        fetchAll(() => supabase.from('kabung_incomes').select('*')),
+        fetchAll(() => supabase.from('kabung_products').select('*')),
+        fetchAll(() => supabase.from('kabung_accounts').select('*')),
+        fetchAll(() => supabase.from('kabung_investors').select('*')),
+        fetchAll(() => supabase.from('kabung_mutations').select('*'))
       ]);
       const failed = results.find(r => r.error);
       if (failed) throw failed.error;
@@ -71,16 +73,9 @@ export default function AdminReports() {
   };
 
   const { periodStart, filteredSales, filteredExpenses, filteredPurchases, filteredIncomes } = useMemo(() => {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    const getStartOfWeek = (d) => {
-      const date = new Date(d);
-      const day = date.getDay();
-      const diff = date.getDate() - day;
-      return new Date(date.setDate(diff)).toISOString().split('T')[0];
-    };
-    const startOfWeekStr = getStartOfWeek(today);
-    const startOfMonthStr = today.toISOString().substring(0, 7) + '-01';
+    const todayStr = todayWIB();
+    const startOfWeekStr = startOfWeekWIB();
+    const startOfMonthStr = `${currentMonthWIB()}-01`;
 
     const filter = (data) => data.filter(item => {
       if (filterPeriod === 'Hari ini') return item.tanggal === todayStr;

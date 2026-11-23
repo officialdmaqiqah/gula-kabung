@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Edit, Trash2, Search, Filter, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
+import { todayWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
@@ -16,7 +18,7 @@ export default function AdminSales() {
   const [filterDate, setFilterDate] = useState('');
   
   const [formData, setFormData] = useState({
-    tanggal: new Date().toISOString().split('T')[0],
+    tanggal: todayWIB(),
     namaPembeli: '',
     produkId: '',
     jumlah: 1,
@@ -37,22 +39,22 @@ export default function AdminSales() {
       setLoading(true);
       
       // Fetch Sales
-      const { data: salesData, error: salesError } = await supabase
+      const { data: salesData, error: salesError } = await fetchAll(() => supabase
         .from('kabung_sales')
         .select('*')
-        .order('tanggal', { ascending: false });
+        .order('tanggal', { ascending: false }));
       if (salesError) throw salesError;
 
       // Fetch Products
-      const { data: productsData, error: productsError } = await supabase
+      const { data: productsData, error: productsError } = await fetchAll(() => supabase
         .from('kabung_products')
-        .select('id, nama_produk, harga_jual, stok');
+        .select('id, nama_produk, harga_jual, stok'));
       if (productsError) throw productsError;
 
       // Fetch Accounts
-      const { data: accountsData, error: accountsError } = await supabase
+      const { data: accountsData, error: accountsError } = await fetchAll(() => supabase
         .from('kabung_accounts')
-        .select('*');
+        .select('*'));
       if (accountsError) throw accountsError;
 
       setSales(salesData || []);
@@ -100,7 +102,7 @@ export default function AdminSales() {
     } else {
       setEditingId(null);
       setFormData({
-        tanggal: new Date().toISOString().split('T')[0],
+        tanggal: todayWIB(),
         namaPembeli: '', 
         produkId: '', 
         jumlah: 1, 

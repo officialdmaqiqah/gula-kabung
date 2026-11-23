@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
+import { todayWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 import { calcAccountBalances } from '../../utils/finance';
 import { Plus, Edit, Trash2, Users, CreditCard, Truck, Settings, Loader2, Save } from 'lucide-react';
@@ -35,16 +37,16 @@ export default function AdminSettings() {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const { data: investorsData } = await supabase.from('kabung_investors').select('*');
-      const { data: accountsData } = await supabase.from('kabung_accounts').select('*');
-      const { data: suppliersData } = await supabase.from('kabung_suppliers').select('*');
+      const { data: investorsData } = await fetchAll(() => supabase.from('kabung_investors').select('*'));
+      const { data: accountsData } = await fetchAll(() => supabase.from('kabung_accounts').select('*'));
+      const { data: suppliersData } = await fetchAll(() => supabase.from('kabung_suppliers').select('*'));
       const { data: settingsData } = await supabase.from('kabung_settings').select('*').eq('id', 'main').single();
       
-      const { data: salesData } = await supabase.from('kabung_sales').select('total_penjualan, rekening_id, status_pembayaran');
-      const { data: purchasesData } = await supabase.from('kabung_purchases').select('harga_beli_total, rekening_id');
-      const { data: incomesData } = await supabase.from('kabung_incomes').select('jumlah, rekening_id');
-      const { data: expensesData } = await supabase.from('kabung_expenses').select('jumlah, rekening_id');
-      const { data: mutationsData } = await supabase.from('kabung_mutations').select('jumlah, dari_rekening_id, ke_rekening_id');
+      const { data: salesData } = await fetchAll(() => supabase.from('kabung_sales').select('total_penjualan, rekening_id, status_pembayaran'));
+      const { data: purchasesData } = await fetchAll(() => supabase.from('kabung_purchases').select('harga_beli_total, rekening_id'));
+      const { data: incomesData } = await fetchAll(() => supabase.from('kabung_incomes').select('jumlah, rekening_id'));
+      const { data: expensesData } = await fetchAll(() => supabase.from('kabung_expenses').select('jumlah, rekening_id'));
+      const { data: mutationsData } = await fetchAll(() => supabase.from('kabung_mutations').select('jumlah, dari_rekening_id, ke_rekening_id'));
 
       setInvestors(investorsData || []);
       setAccounts(accountsData || []);
@@ -126,7 +128,7 @@ export default function AdminSettings() {
         } else {
           // New investor, create income automatically
           const { data: newInc, error: incError } = await supabase.from('kabung_incomes').insert([{
-            tanggal: new Date().toISOString().split('T')[0],
+            tanggal: todayWIB(),
             kategori: 'Modal Awal',
             nama_pemasukan: `Setoran Modal: ${payload.nama}`,
             jumlah: payload.modal,

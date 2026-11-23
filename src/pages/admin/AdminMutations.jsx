@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, ArrowRightLeft, Loader2, Calendar, Wallet, ArrowRight, Save } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
+import { todayWIB, currentMonthWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
@@ -12,14 +14,14 @@ export default function AdminMutations() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const [formData, setFormData] = useState({
-    tanggal: new Date().toISOString().split('T')[0],
+    tanggal: todayWIB(),
     dariRekeningId: '',
     keRekeningId: '',
     jumlah: 0,
     catatan: ''
   });
 
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [filterMonth, setFilterMonth] = useState(currentMonthWIB());
 
   useEffect(() => {
     fetchData();
@@ -28,14 +30,14 @@ export default function AdminMutations() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: mutationsData, error: mutError } = await supabase
+      const { data: mutationsData, error: mutError } = await fetchAll(() => supabase
         .from('kabung_mutations')
         .select('*')
-        .order('tanggal', { ascending: false });
+        .order('tanggal', { ascending: false }));
       
-      const { data: accountsData, error: accError } = await supabase
+      const { data: accountsData, error: accError } = await fetchAll(() => supabase
         .from('kabung_accounts')
-        .select('*');
+        .select('*'));
 
       if (mutError) throw mutError;
       if (accError) throw accError;
@@ -52,7 +54,7 @@ export default function AdminMutations() {
 
   const handleOpenModal = () => {
     setFormData({
-      tanggal: new Date().toISOString().split('T')[0],
+      tanggal: todayWIB(),
       dariRekeningId: accounts.length > 0 ? accounts[0].id : '',
       keRekeningId: accounts.length > 1 ? accounts[1].id : '',
       jumlah: 0,

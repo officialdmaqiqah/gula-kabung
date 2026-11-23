@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Edit, Trash2, Search, Filter, Truck, Loader2, CheckCircle2, Clock, AlertCircle, Receipt } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
+import { todayWIB } from '../../utils/date';
 import { formatRupiah } from '../../utils/format';
 import { toast } from 'react-hot-toast';
 
@@ -17,7 +19,7 @@ export default function AdminPurchases() {
   const [filterDate, setFilterDate] = useState('');
   
   const [formData, setFormData] = useState({
-    tanggal: new Date().toISOString().split('T')[0],
+    tanggal: todayWIB(),
     supplierId: '',
     namaPetani: '',
     produkId: '',
@@ -39,25 +41,25 @@ export default function AdminPurchases() {
     try {
       setLoading(true);
       
-      const { data: purchasesData, error: purchasesError } = await supabase
+      const { data: purchasesData, error: purchasesError } = await fetchAll(() => supabase
         .from('kabung_purchases')
         .select('*')
-        .order('tanggal', { ascending: false });
+        .order('tanggal', { ascending: false }));
       if (purchasesError) throw purchasesError;
 
-      const { data: productsData, error: productsError } = await supabase
+      const { data: productsData, error: productsError } = await fetchAll(() => supabase
         .from('kabung_products')
-        .select('id, nama_produk, stok');
+        .select('id, nama_produk, stok'));
       if (productsError) throw productsError;
 
-      const { data: accountsData, error: accountsError } = await supabase
+      const { data: accountsData, error: accountsError } = await fetchAll(() => supabase
         .from('kabung_accounts')
-        .select('*');
+        .select('*'));
       if (accountsError) throw accountsError;
 
-      const { data: suppliersData, error: suppliersError } = await supabase
+      const { data: suppliersData, error: suppliersError } = await fetchAll(() => supabase
         .from('kabung_suppliers')
-        .select('*');
+        .select('*'));
       if (suppliersError) throw suppliersError;
 
       setPurchases(purchasesData || []);
@@ -120,7 +122,7 @@ export default function AdminPurchases() {
     } else {
       setEditingId(null);
       setFormData({
-        tanggal: new Date().toISOString().split('T')[0],
+        tanggal: todayWIB(),
         supplierId: '', 
         namaPetani: '', 
         produkId: '', 
