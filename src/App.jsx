@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Header from './components/Header';
@@ -26,6 +26,13 @@ import AdminPreorders from './pages/admin/AdminPreorders';
 function App() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
+
+  useEffect(() => {
+    document.querySelector('link[rel="manifest"]')?.setAttribute(
+      'href',
+      isAdmin ? '/admin.webmanifest' : '/manifest.webmanifest'
+    );
+  }, [isAdmin]);
 
   return (
     <div className="min-h-screen flex flex-col font-sans">
