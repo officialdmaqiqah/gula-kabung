@@ -13,6 +13,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Gula Kabung" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script>
+      if (location.pathname.startsWith('/admin')) {
+        document.querySelector('link[rel="manifest"]').setAttribute('href', '/admin.webmanifest');
+        document.querySelector('meta[name="apple-mobile-web-app-title"]').setAttribute('content', 'Admin Kabung');
+      }
+    </script>
     
     <!-- SEO Meta Tags -->
     <title>Gula Kabung Belitung - Gula Aren Asli Warisan Desa Gunung Riting</title>

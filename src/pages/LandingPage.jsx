@@ -267,7 +267,7 @@ export default function LandingPage() {
             <div className="flex gap-10">
               <a href="#" className="hover:text-white transition-colors">Privacy</a>
               <a href="#" className="hover:text-white transition-colors">Terms</a>
-              <Link to="/admin/login" className="text-white/60 hover:text-white transition-colors">Login Admin</Link>
+              <a href="/admin/login" className="text-white/60 hover:text-white transition-colors">Login Admin</a>
             </div>
           </div>
         </div>

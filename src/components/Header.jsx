@@ -126,7 +126,7 @@ export default function Header() {
           <div className="mt-16 pt-8 border-t border-white/10 w-full max-w-sm text-center">
             <p className="text-[10px] font-black text-brand-gold uppercase tracking-[0.4em] mb-4">Butuh Bantuan?</p>
             <a href={storeWhatsapp ? `https://wa.me/${storeWhatsapp}` : undefined} className="text-white/60 hover:text-white font-bold transition-colors">WhatsApp Kami</a>
-            <Link to="/admin/login" className="block mt-5 text-xs text-white/50 hover:text-white font-bold transition-colors">Login Admin</Link>
+            <a href="/admin/login" className="block mt-5 text-xs text-white/50 hover:text-white font-bold transition-colors">Login Admin</a>
           </div>
         </div>
       </div>
