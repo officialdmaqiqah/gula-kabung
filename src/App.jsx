@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Header from './components/Header';
 import ConnectionGuard from './components/ConnectionGuard';
+import InstallPrompt from './components/InstallPrompt';
 import LandingPage from './pages/LandingPage';
 import CatalogPage from './pages/CatalogPage';
 import CheckoutPage from './pages/CheckoutPage';
@@ -100,6 +101,7 @@ function App() {
           </ConnectionGuard>
         </AuthProvider>
       </main>
+      {!isAdmin && <InstallPrompt />}
     </div>
   );
 }
