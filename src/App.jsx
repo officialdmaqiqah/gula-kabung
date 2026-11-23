@@ -3,7 +3,6 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Header from './components/Header';
 import ConnectionGuard from './components/ConnectionGuard';
-import InstallPrompt from './components/InstallPrompt';
 import LandingPage from './pages/LandingPage';
 import CatalogPage from './pages/CatalogPage';
 import CheckoutPage from './pages/CheckoutPage';
@@ -30,10 +29,16 @@ function App() {
   const isAdmin = location.pathname.startsWith('/admin');
 
   useEffect(() => {
-    document.querySelector('link[rel="manifest"]')?.setAttribute(
-      'href',
-      isAdmin ? '/admin.webmanifest' : '/manifest.webmanifest'
-    );
+    const manifest = document.querySelector('link[rel="manifest"]');
+    if (!isAdmin) {
+      manifest?.remove();
+    } else if (!manifest) {
+      const link = document.createElement('link');
+      link.rel = 'manifest';
+      link.href = '/admin.webmanifest';
+      link.crossOrigin = 'use-credentials';
+      document.head.appendChild(link);
+    }
   }, [isAdmin]);
 
   return (
@@ -101,7 +106,6 @@ function App() {
           </ConnectionGuard>
         </AuthProvider>
       </main>
-      {!isAdmin && <InstallPrompt />}
     </div>
   );
 }

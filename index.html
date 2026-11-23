@@ -5,18 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- PWA -->
-    <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- PWA khusus admin -->
     <meta name="theme-color" content="#58372b" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Gula Kabung" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <script>
       if (location.pathname.startsWith('/admin')) {
-        document.querySelector('link[rel="manifest"]').setAttribute('href', '/admin.webmanifest');
-        document.querySelector('meta[name="apple-mobile-web-app-title"]').setAttribute('content', 'Admin Kabung');
+        document.head.insertAdjacentHTML('beforeend', [
+          '<link rel="manifest" href="/admin.webmanifest" crossorigin="use-credentials" />',
+          '<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />',
+          '<meta name="mobile-web-app-capable" content="yes" />',
+          '<meta name="apple-mobile-web-app-capable" content="yes" />',
+          '<meta name="apple-mobile-web-app-title" content="Admin Kabung" />',
+          '<meta name="apple-mobile-web-app-status-bar-style" content="default" />'
+        ].join(''));
       }
     </script>
     

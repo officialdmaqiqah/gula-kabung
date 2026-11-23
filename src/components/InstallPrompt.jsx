@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import { Download, Share, X } from 'lucide-react';
 
 const DISMISS_KEY = 'gula_kabung_install_dismissed_at';
 const DISMISS_MS = 30 * 24 * 60 * 60 * 1000;
-const STORE_PATHS = ['/', '/catalog', '/about', '/education'];
 
 let deferredPrompt = null;
 const listeners = new Set();
@@ -12,7 +10,6 @@ const listeners = new Set();
 const notify = () => listeners.forEach((listener) => listener(deferredPrompt));
 
 window.addEventListener('beforeinstallprompt', (event) => {
-  if (window.location.pathname.startsWith('/admin')) return;
   event.preventDefault();
   deferredPrompt = event;
   notify();
@@ -45,7 +42,6 @@ const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 export default function InstallPrompt() {
-  const { pathname } = useLocation();
   const [installEvent, setInstallEvent] = useState(deferredPrompt);
   const [dismissed, setDismissed] = useState(wasDismissed);
 
@@ -56,9 +52,7 @@ export default function InstallPrompt() {
   }, []);
 
   const showIosHelp = !installEvent && isIos();
-  if (!STORE_PATHS.includes(pathname) || dismissed || isInstalled() || (!installEvent && !showIosHelp)) {
-    return null;
-  }
+  if (dismissed || isInstalled() || (!installEvent && !showIosHelp)) return null;
 
   const handleDismiss = () => {
     saveDismissed();
@@ -75,21 +69,17 @@ export default function InstallPrompt() {
   };
 
   return (
-    <aside
-      aria-label="Pasang aplikasi"
-      className="md:hidden fixed left-4 right-4 z-40 bg-white border border-brand-brown/10 rounded-2xl shadow-2xl p-4"
-      style={{ bottom: 'calc(16px + env(safe-area-inset-bottom))' }}
-    >
+    <aside aria-label="Pasang aplikasi admin" className="relative mt-6 bg-brand-brown/[0.03] border border-brand-brown/10 rounded-2xl p-4">
       <div className="flex items-start gap-3">
         <img src="/icons/icon-192.png" alt="" className="w-11 h-11 rounded-xl shrink-0" />
         <div className="min-w-0 flex-1 pr-6">
-          <h2 className="text-sm font-black text-brand-brown">Pasang aplikasi Gula Kabung</h2>
+          <h2 className="text-sm font-black text-brand-brown">Pasang aplikasi Admin</h2>
           {showIosHelp ? (
             <p className="text-xs text-brand-brown/70 mt-1 leading-relaxed">
               Ketuk <Share className="inline w-3.5 h-3.5 mx-0.5 align-text-bottom" aria-label="Bagikan" /> lalu pilih <strong>Tambah ke Layar Utama</strong>.
             </p>
           ) : (
-            <p className="text-xs text-brand-brown/70 mt-1">Buka toko lebih cepat dari layar HP.</p>
+            <p className="text-xs text-brand-brown/70 mt-1">Buka halaman admin langsung dari ikon aplikasi.</p>
           )}
         </div>
         <button
@@ -105,9 +95,9 @@ export default function InstallPrompt() {
         <button
           type="button"
           onClick={handleInstall}
-          className="mt-3 w-full min-h-11 bg-brand-brown text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-brown-800 transition-colors"
+          className="mt-3 w-full min-h-11 bg-white border border-brand-brown/20 text-brand-brown rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-brand-brown/5 transition-colors"
         >
-          <Download className="w-4 h-4" /> Pasang
+          <Download className="w-4 h-4" /> Pasang Aplikasi
         </button>
       )}
     </aside>

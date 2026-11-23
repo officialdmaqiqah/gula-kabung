@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Store, Lock, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import InstallPrompt from '../../components/InstallPrompt';
 import { Navigate } from 'react-router-dom';
 
 export default function AdminLogin() {
@@ -90,6 +91,8 @@ export default function AdminLogin() {
             {submitting ? 'Memproses...' : 'Login'}
           </button>
         </form>
+
+        <InstallPrompt />
       </div>
     </div>
   );
