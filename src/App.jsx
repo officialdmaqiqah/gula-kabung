@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Header from './components/Header';
+import ConnectionGuard from './components/ConnectionGuard';
 import LandingPage from './pages/LandingPage';
 import CatalogPage from './pages/CatalogPage';
 import CheckoutPage from './pages/CheckoutPage';
@@ -71,6 +72,7 @@ function App() {
       {!isAdmin && <Header />}
       <main className="flex-grow">
         <AuthProvider>
+          <ConnectionGuard>
           <Routes>
             {/* Storefront Routes */}
             <Route path="/" element={<LandingPage />} />
@@ -95,6 +97,7 @@ function App() {
               <Route path="settings" element={<AdminSettings />} />
             </Route>
           </Routes>
+          </ConnectionGuard>
         </AuthProvider>
       </main>
     </div>
