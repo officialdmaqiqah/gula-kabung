@@ -1,44 +1,61 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
+  const [userId, setUserId] = useState(undefined);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
-    const checkAuth = () => {
-      const authState = localStorage.getItem('kabungmart_admin_auth');
-      if (authState === 'true') {
-        setIsAuthenticated(true);
-      } else {
-        setIsAuthenticated(false);
-        if (location.pathname.startsWith('/admin') && location.pathname !== '/admin/login') {
-          navigate('/admin/login');
-        }
-      }
-      setIsLoading(false);
-    };
-    checkAuth();
-  }, [location.pathname, navigate]);
+    supabase.auth.getSession().then(({ data }) => {
+      setUserId(data.session?.user.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
-  const login = (username, password) => {
-    if (username === 'detti' && password === 'salfanun') {
-      localStorage.setItem('kabungmart_admin_auth', 'true');
-      setIsAuthenticated(true);
-      navigate('/admin/dashboard');
-      return true;
+  useEffect(() => {
+    if (userId === undefined) return;
+    if (userId === null) {
+      setIsAuthenticated(false);
+      setIsLoading(false);
+      return;
     }
-    return false;
+
+    let active = true;
+    supabase.rpc('is_kabung_admin').then(({ data, error }) => {
+      if (!active) return;
+      setIsAuthenticated(!error && data === true);
+      setIsLoading(false);
+    });
+    return () => { active = false; };
+  }, [userId]);
+
+  const login = async (email, password) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return false;
+
+    const { data: isAdmin, error: adminError } = await supabase.rpc('is_kabung_admin');
+    if (adminError || isAdmin !== true) {
+      await supabase.auth.signOut();
+      return false;
+    }
+
+    setIsAuthenticated(true);
+    navigate('/admin/dashboard');
+    return true;
   };
 
-  const logout = () => {
-    localStorage.removeItem('kabungmart_admin_auth');
+  const logout = async () => {
+    await supabase.auth.signOut();
     setIsAuthenticated(false);
     navigate('/admin/login');
   };

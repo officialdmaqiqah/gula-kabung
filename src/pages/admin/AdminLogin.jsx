@@ -4,20 +4,24 @@ import { useAuth } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
 export default function AdminLogin() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const { login, isAuthenticated } = useAuth();
 
   if (isAuthenticated) {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = login(username, password);
+    setError('');
+    setSubmitting(true);
+    const success = await login(email, password);
+    setSubmitting(false);
     if (!success) {
-      setError('Username atau password salah');
+      setError('Email atau password salah, atau akun bukan admin');
     }
   };
 
@@ -41,18 +45,19 @@ export default function AdminLogin() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-brown-700 mb-1">
-              Username
+              Email
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <User className="h-5 w-5 text-brown-400" />
               </div>
               <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                autoComplete="username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-brown-50 border border-brown-200 rounded-xl focus:ring-2 focus:ring-brown-400 focus:border-brown-400 outline-none transition-colors"
-                placeholder="Masukkan username"
+                placeholder="Masukkan email"
                 required
               />
             </div>
@@ -79,9 +84,10 @@ export default function AdminLogin() {
 
           <button
             type="submit"
-            className="w-full py-3 bg-gold-500 hover:bg-gold-600 text-white font-bold rounded-xl transition-colors shadow-sm mt-2"
+            disabled={submitting}
+            className="w-full py-3 bg-gold-500 hover:bg-gold-600 text-white font-bold rounded-xl transition-colors shadow-sm mt-2 disabled:opacity-50"
           >
-            Login
+            {submitting ? 'Memproses...' : 'Login'}
           </button>
         </form>
       </div>

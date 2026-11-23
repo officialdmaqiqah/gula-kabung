@@ -46,7 +46,7 @@ export default function CatalogPage() {
       setError(null);
       const { data, fetchError } = await supabase
         .from('kabung_products')
-        .select('*')
+        .select('id, nama_produk, harga_jual, stok, kategori, image_url, deskripsi, ukuran')
         .eq('status_aktif', true)
         .order('created_at', { ascending: false });
 
@@ -371,17 +371,13 @@ export default function CatalogPage() {
                   
                   try {
                     setPreorderSubmitting(true);
-                    const { error } = await supabase.from('kabung_preorders').insert([
-                      {
-                        nama_konsumen: preorderFormData.namaKonsumen,
-                        whatsapp: preorderFormData.whatsapp,
-                        produk_id: preorderProduct.id,
-                        nama_produk: preorderProduct.name,
-                        jumlah: Number(preorderFormData.jumlah),
-                        catatan: preorderFormData.catatan || '',
-                        status: 'Waiting'
-                      }
-                    ]);
+                    const { error } = await supabase.rpc('create_kabung_preorder', {
+                      p_nama: preorderFormData.namaKonsumen,
+                      p_whatsapp: preorderFormData.whatsapp,
+                      p_produk_id: preorderProduct.id,
+                      p_jumlah: Number(preorderFormData.jumlah),
+                      p_catatan: preorderFormData.catatan || ''
+                    });
 
                     if (error) throw error;
                     

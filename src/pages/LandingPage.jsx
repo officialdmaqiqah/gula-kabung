@@ -18,13 +18,13 @@ export default function LandingPage() {
       setLoading(true);
       const { data: productsData } = await supabase
         .from('kabung_products')
-        .select('*')
+        .select('id, nama_produk, harga_jual, stok, image_url')
         .eq('status_aktif', true)
         .order('created_at', { ascending: false });
       
       const { data: settingsData } = await supabase
         .from('kabung_settings')
-        .select('*')
+        .select('hero_image, whatsapp')
         .eq('id', 'main')
         .single();
 

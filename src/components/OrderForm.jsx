@@ -6,7 +6,7 @@ import { formatRupiah } from '../utils/format';
 import { toast } from 'react-hot-toast';
 
 export default function OrderForm() {
-  const { cart, getCartTotal, clearCart } = useCart();
+  const { cart, clearCart } = useCart();
   const [siteSettings, setSiteSettings] = useState({ whatsapp: '6281234567890' });
   const [provinces, setProvinces] = useState([]);
   const [regencies, setRegencies] = useState([]);
@@ -101,45 +101,20 @@ export default function OrderForm() {
         setSubmitting(true);
         const fullAddress = `${formData.address}, Kec. ${selectedDistrict.name}, ${selectedRegency.name}, Prov. ${selectedProvince.name}`;
 
-        // Create Sales Records in Supabase (Pending Status)
-        const salesEntries = cart.map(item => ({
-          tanggal: new Date().toISOString().split('T')[0],
-          nama_pembeli: formData.name,
-          nama_produk: item.name,
-          produk_id: item.id,
-          jumlah: item.quantity,
-          harga_satuan: item.price,
-          total_penjualan: item.price * item.quantity,
-          status_pembayaran: 'Belum bayar',
-          rekening_id: null,
-          catatan: formData.notes || '-'
-        }));
-
-        const { error } = await supabase.from('kabung_sales').insert(salesEntries);
+        // Server menentukan harga dan mengurangi stok dalam satu transaksi
+        const { data: order, error } = await supabase.rpc('create_kabung_order', {
+          p_nama: formData.name,
+          p_catatan: formData.notes,
+          p_items: cart.map(item => ({ id: item.id, quantity: item.quantity }))
+        });
         if (error) throw error;
 
-        // Decrease stock for each item ordered
-        for (const item of cart) {
-          const { data: product, error: fetchError } = await supabase
-            .from('kabung_products')
-            .select('stok')
-            .eq('id', item.id)
-            .single();
-
-          if (!fetchError && product) {
-            await supabase
-              .from('kabung_products')
-              .update({ stok: Math.max(0, (product.stok || 0) - item.quantity) })
-              .eq('id', item.id);
-          }
-        }
-
         // Generate WhatsApp Message
-        const orderItems = cart
-          .map((item) => `- ${item.name} (${item.quantity}x) = ${formatRupiah(item.price * item.quantity)}`)
+        const orderItems = order.items
+          .map((item) => `- ${item.name} (${item.quantity}x) = ${formatRupiah(item.subtotal)}`)
           .join('\n');
 
-        const message = `Halo Gula Kabung Belitung, saya mau order produk premium Anda.\n\nNama: ${formData.name}\nNo. WhatsApp: ${formData.whatsapp}\nAlamat: ${fullAddress}\n\nRincian Pesanan:\n${orderItems}\n\nTotal Pembayaran: ${formatRupiah(getCartTotal())}\nCatatan: ${formData.notes || '-'}`;
+        const message = `Halo Gula Kabung Belitung, saya mau order produk premium Anda.\n\nNama: ${formData.name}\nNo. WhatsApp: ${formData.whatsapp}\nAlamat: ${fullAddress}\n\nRincian Pesanan:\n${orderItems}\n\nTotal Pembayaran: ${formatRupiah(order.total)}\nCatatan: ${formData.notes || '-'}`;
 
         const waUrl = `https://wa.me/${siteSettings.whatsapp}?text=${encodeURIComponent(message)}`;
         

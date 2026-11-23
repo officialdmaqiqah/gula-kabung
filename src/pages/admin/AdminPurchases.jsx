@@ -268,7 +268,11 @@ export default function AdminPurchases() {
                       <button 
                         onClick={() => {
                           const win = window.open();
-                          win.document.write(`<img src="${purchase.bukti_pembayaran}" style="max-width:100%">`);
+                          if (!win) return;
+                          const img = win.document.createElement('img');
+                          img.src = purchase.bukti_pembayaran;
+                          img.style.maxWidth = '100%';
+                          win.document.body.appendChild(img);
                         }}
                         className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
                         title="Lihat Bukti"
