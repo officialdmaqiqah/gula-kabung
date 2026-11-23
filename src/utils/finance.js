@@ -5,6 +5,7 @@ const CAPITAL_CATEGORIES = ['Modal Awal', 'Pendanaan'];
 
 const sumBy = (list, getValue) => list.reduce((sum, item) => sum + Number(getValue(item) || 0), 0);
 const roundTo1000 = (num) => Math.round(num / 1000) * 1000;
+const purchaseGoodsCost = (purchase) => Number(purchase.harga_beli_total || 0) - Number(purchase.bagian_sedekah || 0);
 
 export const isPaidSale = (sale) => sale.status_pembayaran === 'Sudah bayar';
 export const isAllocationExpense = (expense) => ALLOCATION_CATEGORIES.includes(expense.kategori);
@@ -109,9 +110,11 @@ export function calcBalanceSheet({ accounts, products, sales, incomes, purchases
   const cashBank = Object.values(balances).reduce((sum, value) => sum + value, 0);
   const inventoryValue = products.reduce((sum, p) => sum + Number(p.stok) * Number(p.harga_modal), 0);
   const profit = calcProfit({ sales, expenses, incomes, products });
-  const goodsInTransit = Math.max(0, sumBy(purchases, p => p.harga_beli_total) - profit.cogs - inventoryValue);
+  const goodsInTransit = Math.max(0, sumBy(purchases, purchaseGoodsCost) - profit.cogs - inventoryValue);
   const totalCapital = sumBy(accounts, a => a.saldo_awal) + sumBy(incomes.filter(isCapitalIncome), i => i.jumlah);
-  const retainedEarnings = profit.netProfit - sumBy(expenses.filter(isDividendExpense), e => e.jumlah);
+  const retainedEarnings = profit.netProfit
+    - sumBy(expenses.filter(isDividendExpense), e => e.jumlah)
+    - sumBy(purchases, p => p.bagian_sedekah);
   return {
     cashBank, inventoryValue, goodsInTransit,
     totalAssets: cashBank + inventoryValue + goodsInTransit,
@@ -122,8 +125,10 @@ export function calcBalanceSheet({ accounts, products, sales, incomes, purchases
 
 function calcCashMovement({ sales, incomes, expenses, purchases }) {
   const opIn = sumBy(sales.filter(isPaidSale), s => s.total_penjualan) + sumBy(incomes.filter(isOtherIncome), i => i.jumlah);
-  const opOut = sumBy(expenses.filter(e => !isAllocationExpense(e)), e => e.jumlah) + sumBy(purchases, p => p.harga_beli_total);
-  const financing = sumBy(incomes.filter(isCapitalIncome), i => i.jumlah) - sumBy(expenses.filter(isDividendExpense), e => e.jumlah);
+  const opOut = sumBy(expenses.filter(e => !isAllocationExpense(e)), e => e.jumlah) + sumBy(purchases, purchaseGoodsCost);
+  const financing = sumBy(incomes.filter(isCapitalIncome), i => i.jumlah)
+    - sumBy(expenses.filter(isDividendExpense), e => e.jumlah)
+    - sumBy(purchases, p => p.bagian_sedekah);
   return { opIn, opOut, operational: opIn - opOut, financing, netChange: opIn - opOut + financing };
 }
 

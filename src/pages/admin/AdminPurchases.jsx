@@ -29,6 +29,7 @@ export default function AdminPurchases() {
     jumlahBeli: 1,
     jumlahDiterima: 0,
     hargaBeliTotal: 0,
+    bagianSedekah: 0,
     rekeningId: accounts?.length > 0 ? accounts[0].id : '',
     statusPenerimaan: 'Pending',
     buktiPembayaran: '',
@@ -116,6 +117,7 @@ export default function AdminPurchases() {
         jumlahBeli: purchase.jumlah_beli || 1,
         jumlahDiterima: purchase.jumlah_diterima || 0,
         hargaBeliTotal: purchase.harga_beli_total || 0,
+        bagianSedekah: purchase.bagian_sedekah || 0,
         rekeningId: purchase.rekening_id || (accounts?.length > 0 ? accounts[0].id : ''),
         statusPenerimaan: purchase.status_penerimaan || 'Pending',
         buktiPembayaran: purchase.bukti_pembayaran || '',
@@ -132,6 +134,7 @@ export default function AdminPurchases() {
         jumlahBeli: 1, 
         jumlahDiterima: 0,
         hargaBeliTotal: 0,
+        bagianSedekah: 0,
         rekeningId: accounts?.length > 0 ? accounts[0].id : '',
         statusPenerimaan: 'Pending',
         buktiPembayaran: '',
@@ -144,6 +147,7 @@ export default function AdminPurchases() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.produkId) return toast.error('Pilih produk!');
+    if (Number(formData.bagianSedekah) > Number(formData.hargaBeliTotal)) return toast.error('Bagian sedekah tidak boleh melebihi total biaya.');
     
     try {
       setSubmitting(true);
@@ -157,6 +161,7 @@ export default function AdminPurchases() {
         jumlah_beli: Number(formData.jumlahBeli),
         jumlah_diterima: Number(formData.jumlahDiterima),
         harga_beli_total: Number(formData.hargaBeliTotal),
+        bagian_sedekah: Number(formData.bagianSedekah),
         rekening_id: formData.rekeningId,
         status_penerimaan: formData.statusPenerimaan,
         bukti_pembayaran: formData.buktiPembayaran,
@@ -277,7 +282,10 @@ export default function AdminPurchases() {
                       {purchase.status_penerimaan || 'Pending'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right font-black text-brand-brown">{formatRupiah(purchase.harga_beli_total)}</td>
+                  <td className="px-6 py-4 text-right font-black text-brand-brown">
+                    {formatRupiah(purchase.harga_beli_total)}
+                    {Number(purchase.bagian_sedekah) > 0 && <div className="text-[10px] font-bold text-emerald-600">Termasuk sedekah {formatRupiah(purchase.bagian_sedekah)}</div>}
+                  </td>
                   <td className="px-6 py-4 text-center">
                     {purchase.bukti_pembayaran ? (
                       <button 
@@ -354,6 +362,12 @@ export default function AdminPurchases() {
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-brand-brown/50 mb-2">Total Biaya (Rp) *</label>
                   <input required type="number" min="0" value={formData.hargaBeliTotal} onChange={e => setFormData({...formData, hargaBeliTotal: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-brand-brown/10 focus:border-brand-gold outline-none font-black" />
+                </div>
+
+                <div>
+                  <label htmlFor="bagian-sedekah" className="block text-[10px] font-black uppercase tracking-widest text-brand-brown/50 mb-2">Bagian Sedekah (Rp)</label>
+                  <input id="bagian-sedekah" type="number" min="0" value={formData.bagianSedekah} onChange={e => setFormData({...formData, bagianSedekah: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-brand-brown/10 focus:border-brand-gold outline-none font-black" />
+                  <p className="text-[11px] text-brand-brown/50 mt-2">Isi jika Total Biaya termasuk sedekah. Pindahkan dananya lewat Mutasi dari Kantong Sedekah.</p>
                 </div>
 
                 <div>
