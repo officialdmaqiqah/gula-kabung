@@ -192,6 +192,12 @@ export default function AdminDashboard() {
     return (products || []).filter(p => p && Number(p.stok || 0) <= 5);
   }, [products]);
 
+  const stockByProduct = useMemo(() => {
+    return (products || [])
+      .filter(Boolean)
+      .sort((a, b) => (a.nama_produk || '').localeCompare(b.nama_produk || '', 'id'));
+  }, [products]);
+
   if (loading) {
     return (
       <div className="h-[80vh] flex flex-col items-center justify-center text-brand-brown">
@@ -255,20 +261,42 @@ export default function AdminDashboard() {
                 <Package className="w-6 h-6 text-brand-gold" />
               </div>
               <div>
-                <h2 className="text-xl font-black text-brand-brown tracking-tight">Stok Gula Kabung</h2>
+                <h2 className="text-xl font-black text-brand-brown tracking-tight">Stok Produk</h2>
                 <p className="text-[10px] text-brand-brown/40 font-bold uppercase tracking-widest italic">Pergerakan Pcs</p>
               </div>
             </div>
 
             <div className="flex-grow space-y-6">
-              <div className="p-6 bg-brand-brown/[0.02] rounded-3xl border border-brand-brown/5 flex justify-between items-center">
-                <div>
-                  <p className="text-[10px] font-black text-brand-brown/40 uppercase tracking-widest mb-1">Total Saldo Stok</p>
-                  <h4 className="text-3xl font-black text-brand-brown">{stats.totalPcsBalance} <span className="text-sm font-bold text-brand-brown/30">pcs</span></h4>
+              <div className="p-6 bg-brand-brown/[0.02] rounded-3xl border border-brand-brown/5">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] font-black text-brand-brown/40 uppercase tracking-widest mb-1">Total Saldo Stok</p>
+                    <h4 className="text-3xl font-black text-brand-brown">{stats.totalPcsBalance} <span className="text-sm font-bold text-brand-brown/30">pcs</span></h4>
+                  </div>
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-brand-brown/5">
+                    <Package className="w-6 h-6 text-brand-brown/20" />
+                  </div>
                 </div>
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-brand-brown/5">
-                  <Package className="w-6 h-6 text-brand-brown/20" />
-                </div>
+
+                {stockByProduct.length > 0 && (
+                  <ul className="mt-5 pt-4 border-t border-brand-brown/10 space-y-3">
+                    {stockByProduct.map(product => {
+                      const stock = Number(product.stok || 0);
+                      const stockColor = stock <= 0 ? 'text-rose-600' : stock <= 5 ? 'text-amber-600' : 'text-brand-brown';
+                      return (
+                        <li key={product.id} className="flex justify-between items-start gap-3">
+                          <span className="min-w-0 text-sm font-bold text-brand-brown/70 break-words">
+                            {product.nama_produk}
+                            {product.status_aktif === false && <span className="ml-2 text-[10px] font-bold text-brand-brown/40">Nonaktif</span>}
+                          </span>
+                          <span className={`shrink-0 text-sm font-black ${stockColor}`}>
+                            {stock} <span className="text-[10px] font-bold opacity-60">{product.satuan || 'pcs'}</span>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
