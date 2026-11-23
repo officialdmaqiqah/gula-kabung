@@ -150,8 +150,10 @@ export default function AdminSettings() {
           atas_nama: formData.atasNama,
           saldo_awal: Number(formData.saldoAwal)
         };
-        if (editingId) await supabase.from('kabung_accounts').update(payload).eq('id', editingId);
-        else await supabase.from('kabung_accounts').insert([payload]);
+        const { error } = editingId
+          ? await supabase.from('kabung_accounts').update(payload).eq('id', editingId)
+          : await supabase.from('kabung_accounts').insert([payload]);
+        if (error) throw error;
       } 
       else if (activeTab === 'supplier') {
         const payload = {
@@ -159,8 +161,10 @@ export default function AdminSettings() {
           kontak: formData.kontak,
           alamat: formData.alamat
         };
-        if (editingId) await supabase.from('kabung_suppliers').update(payload).eq('id', editingId);
-        else await supabase.from('kabung_suppliers').insert([payload]);
+        const { error } = editingId
+          ? await supabase.from('kabung_suppliers').update(payload).eq('id', editingId)
+          : await supabase.from('kabung_suppliers').insert([payload]);
+        if (error) throw error;
       }
 
       await fetchInitialData();
@@ -180,16 +184,22 @@ export default function AdminSettings() {
       setLoading(true);
       if (activeTab === 'investor') {
         const inv = investors.find(i => i.id === id);
-        if (inv?.income_id) await supabase.from('kabung_incomes').delete().eq('id', inv.income_id);
-        await supabase.from('kabung_investors').delete().eq('id', id);
+        const { error } = await supabase.from('kabung_investors').delete().eq('id', id);
+        if (error) throw error;
+        if (inv?.income_id) {
+          const { error: incomeError } = await supabase.from('kabung_incomes').delete().eq('id', inv.income_id);
+          if (incomeError) throw incomeError;
+        }
       } else if (activeTab === 'account') {
         const acc = accounts.find(a => a.id === id);
         if (acc?.nama_rekening === 'Kas Tunai' || acc?.nama_rekening?.startsWith('Kantong')) {
           return alert(`${acc.nama_rekening} tidak bisa dihapus.`);
         }
-        await supabase.from('kabung_accounts').delete().eq('id', id);
+        const { error } = await supabase.from('kabung_accounts').delete().eq('id', id);
+        if (error) throw error;
       } else if (activeTab === 'supplier') {
-        await supabase.from('kabung_suppliers').delete().eq('id', id);
+        const { error } = await supabase.from('kabung_suppliers').delete().eq('id', id);
+        if (error) throw error;
       }
       await fetchInitialData();
       toast.success('Data berhasil dihapus!');

@@ -34,7 +34,10 @@ export function calcProfit({ sales, expenses, incomes, products }) {
   const paidSales = sales.filter(isPaidSale);
   const costById = new Map(products.map(p => [p.id, Number(p.harga_modal) || 0]));
   const revenue = sumBy(paidSales, s => s.total_penjualan);
-  const cogs = paidSales.reduce((sum, s) => sum + (costById.get(s.produk_id) || 0) * Number(s.jumlah), 0);
+  const cogs = paidSales.reduce((sum, s) => {
+    const unitCost = s.hpp_satuan != null ? Number(s.hpp_satuan) : (costById.get(s.produk_id) || 0);
+    return sum + unitCost * Number(s.jumlah);
+  }, 0);
   const opex = sumBy(expenses.filter(e => !isAllocationExpense(e)), e => e.jumlah);
   const otherIncome = sumBy(incomes.filter(isOtherIncome), i => i.jumlah);
   const grossProfit = revenue - cogs;
@@ -117,13 +120,16 @@ export function calcBalanceSheet({ accounts, products, sales, incomes, purchases
   };
 }
 
-export function calcCashflow({ sales, incomes, expenses, purchases, accounts }) {
+function calcCashMovement({ sales, incomes, expenses, purchases }) {
   const opIn = sumBy(sales.filter(isPaidSale), s => s.total_penjualan) + sumBy(incomes.filter(isOtherIncome), i => i.jumlah);
   const opOut = sumBy(expenses.filter(e => !isAllocationExpense(e)), e => e.jumlah) + sumBy(purchases, p => p.harga_beli_total);
   const financing = sumBy(incomes.filter(isCapitalIncome), i => i.jumlah) - sumBy(expenses.filter(isDividendExpense), e => e.jumlah);
+  return { opIn, opOut, operational: opIn - opOut, financing, netChange: opIn - opOut + financing };
+}
+
+export function calcCashflow({ sales, incomes, expenses, purchases, accounts, before }) {
   return {
-    opIn, opOut, operational: opIn - opOut, financing,
-    netChange: opIn - opOut + financing,
-    beginningBalance: sumBy(accounts, a => a.saldo_awal)
+    ...calcCashMovement({ sales, incomes, expenses, purchases }),
+    beginningBalance: sumBy(accounts, a => a.saldo_awal) + calcCashMovement(before).netChange
   };
 }

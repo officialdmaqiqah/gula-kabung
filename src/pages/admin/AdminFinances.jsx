@@ -91,8 +91,10 @@ export default function AdminFinances() {
     try {
       setSubmitting(true);
       const payload = { tanggal: expenseForm.tanggal, kategori: expenseForm.kategori, nama_pengeluaran: expenseForm.namaPengeluaran, jumlah: Number(expenseForm.jumlah), rekening_id: expenseForm.rekeningId, catatan: expenseForm.catatan };
-      if (editingId) await supabase.from('kabung_expenses').update(payload).eq('id', editingId);
-      else await supabase.from('kabung_expenses').insert([payload]);
+      const { error } = editingId
+        ? await supabase.from('kabung_expenses').update(payload).eq('id', editingId)
+        : await supabase.from('kabung_expenses').insert([payload]);
+      if (error) throw error;
       await fetchInitialData();
       setIsExpenseModalOpen(false);
     } catch (error) { alert('Gagal: ' + error.message); } finally { setSubmitting(false); }
@@ -114,15 +116,30 @@ export default function AdminFinances() {
     try {
       setSubmitting(true);
       const payload = { tanggal: incomeForm.tanggal, kategori: incomeForm.kategori, nama_pemasukan: incomeForm.namaPemasukan, jumlah: Number(incomeForm.jumlah), rekening_id: incomeForm.rekeningId, catatan: incomeForm.catatan };
-      if (editingId) await supabase.from('kabung_incomes').update(payload).eq('id', editingId);
-      else await supabase.from('kabung_incomes').insert([payload]);
+      const { error } = editingId
+        ? await supabase.from('kabung_incomes').update(payload).eq('id', editingId)
+        : await supabase.from('kabung_incomes').insert([payload]);
+      if (error) throw error;
       await fetchInitialData();
       setIsIncomeModalOpen(false);
     } catch (error) { alert('Gagal: ' + error.message); } finally { setSubmitting(false); }
   };
 
-  const handleDeleteExpense = async (id) => { if (window.confirm('Hapus?')) { setLoading(true); await supabase.from('kabung_expenses').delete().eq('id', id); await fetchInitialData(); setLoading(false); } };
-  const handleDeleteIncome = async (id) => { if (window.confirm('Hapus?')) { setLoading(true); await supabase.from('kabung_incomes').delete().eq('id', id); await fetchInitialData(); setLoading(false); } };
+  const deleteRow = async (table, id) => {
+    if (!window.confirm('Hapus?')) return;
+    try {
+      setLoading(true);
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) throw error;
+      await fetchInitialData();
+    } catch (error) {
+      alert('Gagal menghapus: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleDeleteExpense = (id) => deleteRow('kabung_expenses', id);
+  const handleDeleteIncome = (id) => deleteRow('kabung_incomes', id);
 
   // --- UNIFIED TRANSACTIONS LIST ---
   const allTransactions = useMemo(() => {

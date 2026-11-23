@@ -70,7 +70,7 @@ export default function AdminReports() {
     }
   };
 
-  const { filteredSales, filteredExpenses, filteredPurchases, filteredIncomes } = useMemo(() => {
+  const { periodStart, filteredSales, filteredExpenses, filteredPurchases, filteredIncomes } = useMemo(() => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     const getStartOfWeek = (d) => {
@@ -94,7 +94,16 @@ export default function AdminReports() {
       return true;
     });
 
+    const startByPeriod = {
+      'Hari ini': todayStr,
+      'Minggu ini': startOfWeekStr,
+      'Bulan ini': startOfMonthStr,
+      'Pilih Bulan': `${filterMonth}-01`,
+      Custom: customStartDate
+    };
+
     return {
+      periodStart: startByPeriod[filterPeriod] || null,
       filteredSales: filter(sales.filter(s => s.status_pembayaran === 'Sudah bayar')),
       filteredExpenses: filter(expenses),
       filteredPurchases: filter(purchases),
@@ -153,10 +162,22 @@ export default function AdminReports() {
   );
 
   // ARUS KAS
-  const cashflow = useMemo(
-    () => calcCashflow({ sales: filteredSales, incomes: filteredIncomes, expenses: filteredExpenses, purchases: filteredPurchases, accounts }),
-    [filteredSales, filteredIncomes, filteredExpenses, filteredPurchases, accounts]
-  );
+  const cashflow = useMemo(() => {
+    const isBeforePeriod = (item) => Boolean(periodStart) && item.tanggal < periodStart;
+    return calcCashflow({
+      sales: filteredSales,
+      incomes: filteredIncomes,
+      expenses: filteredExpenses,
+      purchases: filteredPurchases,
+      accounts,
+      before: {
+        sales: sales.filter(isBeforePeriod),
+        incomes: incomes.filter(isBeforePeriod),
+        expenses: expenses.filter(isBeforePeriod),
+        purchases: purchases.filter(isBeforePeriod)
+      }
+    });
+  }, [periodStart, filteredSales, filteredIncomes, filteredExpenses, filteredPurchases, accounts, sales, incomes, expenses, purchases]);
 
   if (loading) return <div className="h-[60vh] flex flex-col items-center justify-center"><Loader2 className="w-12 h-12 text-brand-gold animate-spin mb-4" /><p className="text-brand-brown/40 font-bold uppercase tracking-widest text-xs">Loading...</p></div>;
 
